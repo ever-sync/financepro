@@ -50,8 +50,8 @@ export default function Investimentos() {
           <DialogContent>
             <DialogHeader><DialogTitle>Novo Investimento</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2"><Label>Descrição</Label><Input name="description" required /></div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="md:col-span-2"><Label>Descrição</Label><Input name="description" required /></div>
                 <div><Label>Instituição</Label><Input name="institution" required /></div>
                 <div><Label>Tipo</Label>
                   <Select name="type" required>

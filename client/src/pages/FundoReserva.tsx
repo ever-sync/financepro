@@ -15,9 +15,16 @@ import { toast } from "sonner";
 
 export default function FundoReserva() {
   const utils = trpc.useUtils();
-  const { data: companyItems = [] } = trpc.reserveFunds.list.useQuery({ type: "empresa" });
-  const { data: personalItems = [] } = trpc.reserveFunds.list.useQuery({ type: "pessoal" });
-  const { data: settings } = trpc.settings.get.useQuery();
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year  = now.getFullYear();
+
+  const { data: companyItems = [] }   = trpc.reserveFunds.list.useQuery({ type: "empresa" });
+  const { data: personalItems = [] }  = trpc.reserveFunds.list.useQuery({ type: "pessoal" });
+  const { data: settings }            = trpc.settings.get.useQuery();
+  const { data: companyFixed = [] }   = trpc.companyFixedCosts.list.useQuery({ month, year });
+  const { data: personalFixed = [] }  = trpc.personalFixedCosts.list.useQuery({ month, year });
+
   const createMut = trpc.reserveFunds.create.useMutation({ onSuccess: () => { utils.reserveFunds.list.invalidate(); toast.success("Depósito adicionado"); setOpen(false); } });
   const deleteMut = trpc.reserveFunds.delete.useMutation({ onSuccess: () => { utils.reserveFunds.list.invalidate(); toast.success("Removido"); } });
   const [open, setOpen] = useState(false);
@@ -34,11 +41,16 @@ export default function FundoReserva() {
     });
   };
 
-  const companyTotal = companyItems.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
-  const personalTotal = personalItems.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
-  const companyGoal = 15000 * (settings?.companyReserveMonths || 3); // placeholder
-  const personalGoal = 5000 * (settings?.personalReserveMonths || 6); // placeholder
-  const companyProgress = companyGoal > 0 ? Math.min((companyTotal / companyGoal) * 100, 100) : 0;
+  const companyTotal    = companyItems.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
+  const personalTotal   = personalItems.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
+
+  // Meta = meses configurados × total mensal das contas fixas
+  const companyMonthly  = companyFixed.reduce((s, i) => s + parseFloat(i.amount), 0);
+  const personalMonthly = personalFixed.reduce((s, i) => s + parseFloat(i.amount), 0);
+  const companyGoal     = companyMonthly  * (settings?.companyReserveMonths  || 3);
+  const personalGoal    = personalMonthly * (settings?.personalReserveMonths || 6);
+
+  const companyProgress  = companyGoal  > 0 ? Math.min((companyTotal  / companyGoal)  * 100, 100) : 0;
   const personalProgress = personalGoal > 0 ? Math.min((personalTotal / personalGoal) * 100, 100) : 0;
 
   const renderTable = (items: typeof companyItems) => (
@@ -82,7 +94,7 @@ export default function FundoReserva() {
           <DialogContent>
             <DialogHeader><DialogTitle>Novo Depósito</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div><Label>Tipo</Label>
                   <Select name="type" defaultValue="empresa">
                     <SelectTrigger><SelectValue /></SelectTrigger>

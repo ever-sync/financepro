@@ -1,4 +1,3 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
@@ -150,7 +149,13 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+function getPackageName(id: string) {
+  const tail = id.split("node_modules/").pop() ?? "";
+  const match = tail.match(/^(@[^/]+\/[^/]+|[^/]+)/);
+  return match?.[1] ?? null;
+}
+
+const plugins = [react(), tailwindcss(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
   plugins,
@@ -167,6 +172,33 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          const pkg = getPackageName(id);
+          if (!pkg) return "vendor";
+          if (pkg === "react" || pkg === "react-dom" || pkg === "react/jsx-runtime") return "react-core";
+          if (pkg.startsWith("@radix-ui/")) return "radix";
+          if (pkg.startsWith("@tanstack/") || pkg.startsWith("@trpc/")) return "data";
+          if (pkg.startsWith("recharts")) return "charts";
+          if (pkg.startsWith("date-fns")) return "dates";
+          if (pkg.startsWith("lucide-react")) return "icons";
+          if (pkg.startsWith("framer-motion")) return "motion";
+          if (pkg.startsWith("superjson")) return "serialization";
+          if (pkg.startsWith("react-hook-form")) return "forms";
+          if (pkg.startsWith("react-day-picker")) return "calendar";
+          if (pkg.startsWith("react-resizable-panels")) return "panels";
+          if (pkg.startsWith("embla-carousel-react")) return "carousel";
+          if (pkg.startsWith("next-themes")) return "theme";
+          if (pkg.startsWith("cmdk")) return "cmdk";
+          if (pkg.startsWith("input-otp")) return "otp";
+          if (pkg.startsWith("sonner")) return "toast";
+          if (pkg.startsWith("vaul")) return "drawer";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     host: true,

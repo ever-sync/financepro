@@ -51,10 +51,10 @@ export function ManusDialog({
       open={onOpenChange ? open : internalOpen}
       onOpenChange={handleOpenChange}
     >
-      <DialogContent className="py-5 bg-[#f8f8f7] rounded-[20px] w-[400px] shadow-[0px_4px_11px_0px_rgba(0,0,0,0.08)] border border-[rgba(0,0,0,0.08)] backdrop-blur-2xl p-0 gap-0 text-center">
-        <div className="flex flex-col items-center gap-2 p-5 pt-12">
+      <DialogContent className="p-0 text-center sm:max-w-md">
+        <div className="flex flex-col items-center gap-4 px-6 py-10">
           {logo ? (
-            <div className="w-16 h-16 bg-white rounded-xl border border-[rgba(0,0,0,0.08)] flex items-center justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
               <img
                 src={logo}
                 alt="Dialog graphic"
@@ -65,21 +65,18 @@ export function ManusDialog({
 
           {/* Title and subtitle */}
           {title ? (
-            <DialogTitle className="text-xl font-semibold text-[#34322d] leading-[26px] tracking-[-0.44px]">
+            <DialogTitle className="text-xl font-semibold tracking-tight text-foreground">
               {title}
             </DialogTitle>
           ) : null}
-          <DialogDescription className="text-sm text-[#858481] leading-5 tracking-[-0.154px]">
+          <DialogDescription className="text-sm text-muted-foreground">
             Please login with Manus to continue
           </DialogDescription>
         </div>
 
-        <DialogFooter className="px-5 py-5">
+        <DialogFooter className="px-6 pb-6">
           {/* Login button */}
-          <Button
-            onClick={onLogin}
-            className="w-full h-10 bg-[#1a1a19] hover:bg-[#1a1a19]/90 text-white rounded-[10px] text-sm font-medium leading-5 tracking-[-0.154px]"
-          >
+          <Button onClick={onLogin} className="w-full">
             Login with Manus
           </Button>
         </DialogFooter>

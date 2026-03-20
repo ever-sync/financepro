@@ -43,6 +43,27 @@
       "when": 1773966000000,
       "tag": "0005_employee_payment_day",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773972130327,
+      "tag": "0007_magical_chameleon",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1742515200000,
+      "tag": "0008_revenue_series",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773973424868,
+      "tag": "0009_nice_havok",
+      "breakpoints": true
     }
   ]
 }

@@ -98,8 +98,8 @@ export default function ContasVariaveis() {
                 <DialogTitle>Nova Conta Variavel Pessoal</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
                     <Label>Descricao</Label>
                     <Input name="description" required />
                   </div>
@@ -126,7 +126,7 @@ export default function ContasVariaveis() {
                     <Label>Data da 1a parcela</Label>
                     <Input name="date" type="date" required />
                   </div>
-                  <div className="col-span-2 rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-3">
+                  <div className="md:col-span-2 rounded-2xl border border-zinc-200 bg-zinc-50/80 px-4 py-3">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-zinc-900">Compra parcelada</p>

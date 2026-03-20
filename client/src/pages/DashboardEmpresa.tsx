@@ -27,8 +27,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Bell,
-  Building2,
-  CalendarDays,
   ChevronDown,
   CreditCard,
   DollarSign,
@@ -66,186 +64,95 @@ type WalletItem = {
   code: string;
   label: string;
   amount: number;
-  status: "Active" | "Inactive";
+  status: "Ativa" | "Inativa";
   tone: "emerald" | "amber" | "slate";
+  progress: number;
 };
 
 type ActivityItem = {
   orderId: string;
   activity: string;
   price: number;
-  status: "Completed" | "Pending" | "In Progress";
+  status: "Concluído" | "Pendente" | "Em andamento";
   date: string;
-  icon: LucideIcon;
+  kind: "revenue" | "fixedCost" | "variableCost" | "purchase" | "payroll" | "reserve";
   tone: "emerald" | "rose" | "amber" | "blue";
 };
 
 const panelClass =
   "rounded-[28px] border border-zinc-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]";
 
-const softPanelClass =
-  "rounded-[24px] border border-zinc-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.05)]";
-
 function formatMoney(value: number | string | null | undefined): string {
   const num = typeof value === "string" ? parseFloat(value) : (value ?? 0);
-  return num.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function asNumber(value: number | string | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = typeof value === "string" ? Number.parseFloat(value) : Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function percentageChange(current: number, previous: number) {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return ((current - previous) / Math.abs(previous)) * 100;
 }
 
 const dashboardTabs: TabItem[] = [
-  { label: "Overview" },
-  { label: "Activity" },
-  { label: "Manage" },
-  { label: "Program" },
-  { label: "Account" },
-  { label: "Reports" },
-];
-
-const demoActivities: ActivityItem[] = [
-  {
-    orderId: "INV_000076",
-    activity: "Mobile App Purchase",
-    price: 25500,
-    status: "Completed",
-    date: "17 Apr, 2026 03:45 PM",
-    icon: ShoppingCart,
-    tone: "emerald",
-  },
-  {
-    orderId: "INV_000075",
-    activity: "Hotel Booking",
-    price: 32750,
-    status: "Pending",
-    date: "15 Apr, 2026 11:30 AM",
-    icon: Building2,
-    tone: "rose",
-  },
-  {
-    orderId: "INV_000074",
-    activity: "Flight Ticket Booking",
-    price: 40200,
-    status: "Completed",
-    date: "15 Apr, 2026 12:00 PM",
-    icon: CalendarDays,
-    tone: "emerald",
-  },
-  {
-    orderId: "INV_000073",
-    activity: "Grocery Purchase",
-    price: 50200,
-    status: "In Progress",
-    date: "14 Apr, 2026 09:15 PM",
-    icon: Receipt,
-    tone: "amber",
-  },
-  {
-    orderId: "INV_000072",
-    activity: "Software License",
-    price: 15900,
-    status: "Completed",
-    date: "10 Apr, 2026 06:00 AM",
-    icon: CreditCard,
-    tone: "blue",
-  },
+  { label: "Visão geral" },
+  { label: "Movimentações" },
+  { label: "Gerenciar" },
+  { label: "Programa" },
+  { label: "Conta" },
+  { label: "Relatórios" },
 ];
 
 export default function DashboardEmpresa() {
   const { user } = useAuth();
   const { month, year } = useMonthYear();
   const { data, isLoading } = trpc.dashboard.company.useQuery({ month, year });
-  const [activeTab, setActiveTab] = useState("Overview");
+  const [activeTab, setActiveTab] = useState("Visão geral");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const companyName = data?.settings?.companyName?.trim() || "FinancePro";
   const userName = user?.name?.trim() || "Sajibur Rahman";
   const userEmail = user?.email?.trim() || "sajibur.rahman@...com";
 
-  const grossRevenue = parseFloat(data?.revenue?.totalGross || "0");
-  const netRevenue = parseFloat(data?.revenue?.totalNet || "0");
-  const totalFixedCosts = parseFloat(data?.fixedCosts?.total || "0");
-  const totalVarCosts = parseFloat(data?.variableCosts?.total || "0");
-  const totalEmployees = parseFloat(data?.employees?.totalCost || "0");
-  const totalPurchases = parseFloat(data?.purchases?.total || "0");
-  const proLabore = parseFloat(data?.settings?.proLaboreGross || "0");
-  const reserveTotal = parseFloat(data?.reserve?.total || "0");
+  const currentSummary = data?.summary?.current;
+  const previousSummary = data?.summary?.previous;
 
-  const hasRealData =
-    grossRevenue > 0 ||
-    netRevenue > 0 ||
-    totalFixedCosts > 0 ||
-    totalVarCosts > 0 ||
-    totalEmployees > 0 ||
-    totalPurchases > 0 ||
-    proLabore > 0 ||
-    reserveTotal > 0;
+  const grossRevenue = asNumber(currentSummary?.grossRevenue ?? data?.revenue?.totalGross);
+  const netRevenue = asNumber(currentSummary?.netRevenue ?? data?.revenue?.totalNet);
+  const totalFixedCosts = asNumber(currentSummary?.fixedCosts ?? data?.fixedCosts?.total);
+  const totalVarCosts = asNumber(currentSummary?.variableCosts ?? data?.variableCosts?.total);
+  const totalEmployees = asNumber(currentSummary?.employeeCosts ?? data?.employees?.totalCost);
+  const totalPurchases = asNumber(currentSummary?.purchases ?? data?.purchases?.total);
+  const proLabore = asNumber(data?.settings?.proLaboreGross);
+  const reserveTotal = asNumber(currentSummary?.reserve ?? data?.reserve?.total);
 
-  const totalSpendingReal =
-    totalFixedCosts + totalVarCosts + totalEmployees + totalPurchases + proLabore;
-  const profitReal = netRevenue - totalSpendingReal;
-  const balanceReal = Math.max(netRevenue - totalSpendingReal + reserveTotal, 0);
-
-  const displayGrossRevenue = hasRealData ? grossRevenue : 850;
-  const displayNetRevenue = hasRealData ? netRevenue : 1050;
-  const displaySpending = hasRealData ? totalSpendingReal : 700;
-  const displayProfit = hasRealData ? profitReal : 950;
-  const displayBalance = hasRealData ? balanceReal : 689372;
-  const displayReserve = hasRealData ? reserveTotal : 18345;
-
-  const spendingLimit = Math.max(displaySpending * 1.25, 5500);
-  const spendingProgress = Math.min((displaySpending / spendingLimit) * 100, 100);
-  const reserveMonths = data?.settings?.companyReserveMonths || 3;
-  const reserveGoal = Math.max(displaySpending * reserveMonths, 1);
-  const reserveProgress = Math.min((displayReserve / reserveGoal) * 100, 100);
-
-  const chartData = useMemo(() => {
-    const profitBase = hasRealData
-      ? Math.max(displayNetRevenue / 8, 5000)
-      : 32000;
-    const lossBase = hasRealData
-      ? Math.max(displaySpending / 8, 4000)
-      : 18000;
-
-    const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago"];
-    const profitPattern = [0.78, 0.94, 0.86, 0.9, 1.04, 1.2, 1.08, 0.92];
-    const lossPattern = [1.05, 0.92, 1.02, 0.88, 0.96, 1.1, 0.98, 0.9];
-
-    return monthLabels.map((label, index) => ({
-      month: label,
-      profit: Math.round(profitBase * profitPattern[index]),
-      loss: Math.round(lossBase * lossPattern[index]),
-    }));
-  }, [displayNetRevenue, displaySpending, hasRealData]);
-
-  const wallets: WalletItem[] = useMemo(
-    () => [
-      {
-        code: "USD",
-        label: "Main wallet",
-        amount: displayBalance,
-        status: "Active",
-        tone: "emerald",
-      },
-      {
-        code: "USD",
-        label: "Strategic reserve",
-        amount: displayReserve,
-        status: "Active",
-        tone: "amber",
-      },
-      {
-        code: "EUR",
-        label: "Secondary flow",
-        amount: Math.max(displayNetRevenue * 0.18, 15000),
-        status: "Inactive",
-        tone: "slate",
-      },
-    ],
-    [displayBalance, displayNetRevenue, displayReserve]
+  const totalSpendingReal = asNumber(
+    currentSummary?.spending ??
+      totalFixedCosts + totalVarCosts + totalEmployees + totalPurchases + proLabore
   );
+  const profitReal = asNumber(currentSummary?.profit ?? netRevenue - totalSpendingReal);
+  const balanceReal = asNumber(currentSummary?.balance ?? profitReal + reserveTotal);
+
+  const chartData = data?.chartSeries ?? [];
+  const wallets = data?.wallets ?? [];
+  const activities = data?.activities ?? [];
+
+  const displayGrossRevenue = grossRevenue;
+  const displayNetRevenue = netRevenue;
+  const displaySpending = totalSpendingReal;
+  const displayProfit = profitReal;
+  const displayBalance = balanceReal;
+
+  const spendingLimit = Math.max(totalSpendingReal * 1.25, 5500);
+  const spendingProgress = Math.min((displaySpending / spendingLimit) * 100, 100);
 
   const visibleActivities = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return demoActivities;
-    return demoActivities.filter(item => {
+    if (!query) return activities;
+    return activities.filter(item => {
       return (
         item.orderId.toLowerCase().includes(query) ||
         item.activity.toLowerCase().includes(query) ||
@@ -253,17 +160,17 @@ export default function DashboardEmpresa() {
         item.date.toLowerCase().includes(query)
       );
     });
-  }, [searchQuery]);
+  }, [activities, searchQuery]);
 
   if (isLoading) {
     return <DashboardPageSkeleton />;
   }
 
-  const displayDeltaProfit = displayProfit >= 0 ? 7 : -7;
-  const displayDeltaBalance = 5;
-  const displayDeltaSpending = 5;
-  const displayDeltaIncome = 8;
-  const displayDeltaRevenue = 4;
+  const displayDeltaProfit = percentageChange(displayProfit, asNumber(previousSummary?.profit));
+  const displayDeltaBalance = percentageChange(displayBalance, asNumber(previousSummary?.balance));
+  const displayDeltaSpending = percentageChange(asNumber(previousSummary?.spending), displaySpending);
+  const displayDeltaIncome = percentageChange(displayNetRevenue, asNumber(previousSummary?.netRevenue));
+  const displayDeltaRevenue = percentageChange(displayGrossRevenue, asNumber(previousSummary?.grossRevenue));
 
   return (
     <div className="-mx-4 -my-4 min-h-full bg-[#f4f4f2] text-zinc-900 md:-mx-6 md:-my-6">
@@ -303,9 +210,9 @@ export default function DashboardEmpresa() {
 
           <div className="flex items-center gap-2 self-end xl:self-auto">
             <div className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-              <HeaderIconButton icon={Search} title="Search" />
-              <HeaderIconButton icon={Bell} title="Notifications" badge />
-              <HeaderIconButton icon={Info} title="Information" />
+              <HeaderIconButton icon={Search} title="Pesquisar" />
+              <HeaderIconButton icon={Bell} title="Notificações" badge />
+              <HeaderIconButton icon={Info} title="Informações" />
             </div>
 
             <DropdownMenu>
@@ -343,11 +250,11 @@ export default function DashboardEmpresa() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer rounded-xl px-3 py-2 text-sm text-zinc-700 focus:bg-zinc-100">
                   <Settings className="mr-2 size-4" />
-                  Settings
+                  Configurações
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer rounded-xl px-3 py-2 text-sm text-zinc-700 focus:bg-zinc-100">
                   <LayoutDashboard className="mr-2 size-4" />
-                  Reports
+                  Relatórios
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -356,10 +263,10 @@ export default function DashboardEmpresa() {
 
         <section className="space-y-2 pt-1">
           <h1 className="text-4xl font-semibold tracking-tight text-zinc-900 md:text-5xl">
-            Good morning, {userName.split(" ")[0] || "Sajibur"}
+            Bom dia, {userName.split(" ")[0] || "Sajibur"}
           </h1>
           <p className="max-w-2xl text-sm text-zinc-500 md:text-base">
-            Stay on top of your tasks, monitor progress, and track status.
+            Acompanhe suas tarefas, monitore o progresso e acompanhe os status.
           </p>
         </section>
 
@@ -368,27 +275,27 @@ export default function DashboardEmpresa() {
             <CardContent className="p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm text-zinc-500">Total Balance</p>
+                  <p className="text-sm text-zinc-500">Saldo total</p>
                   <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900 xl:text-4xl">
                     {formatMoney(displayBalance)}
                   </p>
                   <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                     <ArrowUpRight className="size-4" />
-                    +{Math.abs(displayDeltaBalance)}% than last month
+                    +{Math.abs(displayDeltaBalance)}% em relação ao mês anterior
                   </p>
                 </div>
 
                 <div className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-500 shadow-sm">
-                  USD
+                  R$
                 </div>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
                 <Button className="rounded-full bg-zinc-900 px-5 text-white shadow-sm hover:bg-zinc-800">
-                  Transfer
+                  Transferir
                 </Button>
                 <Button className="rounded-full border border-zinc-200 bg-white px-5 text-zinc-700 shadow-sm hover:bg-zinc-50">
-                  Request
+                  Solicitar
                 </Button>
               </div>
 
@@ -396,9 +303,11 @@ export default function DashboardEmpresa() {
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-zinc-900">
-                      Wallets
+                      Carteiras
                     </p>
-                    <p className="text-xs text-zinc-500">Total 6 wallets</p>
+                    <p className="text-xs text-zinc-500">
+                      Total de {wallets.length} carteiras
+                    </p>
                   </div>
                 </div>
 
@@ -413,26 +322,26 @@ export default function DashboardEmpresa() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <MetricCard
-              label="Total Earnings"
+              label="Lucro total"
               value={displayProfit}
               delta={displayDeltaProfit}
               icon={Sparkles}
               highlighted
             />
             <MetricCard
-              label="Total Spending"
+              label="Gastos totais"
               value={displaySpending}
               delta={displayDeltaSpending}
               icon={TrendingDown}
             />
             <MetricCard
-              label="Total Income"
+              label="Receita líquida"
               value={displayNetRevenue}
               delta={displayDeltaIncome}
               icon={TrendingUp}
             />
             <MetricCard
-              label="Total Revenue"
+              label="Receita bruta"
               value={displayGrossRevenue}
               delta={displayDeltaRevenue}
               icon={DollarSign}
@@ -444,20 +353,20 @@ export default function DashboardEmpresa() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <CardTitle className="text-base font-semibold text-zinc-900">
-                    Total Income
+                    Receita do período
                   </CardTitle>
                   <p className="mt-1 text-sm text-zinc-500">
-                    View your income in a certain period of time
+                    Visualize a receita em um período específico.
                   </p>
                 </div>
                 <div className="flex items-center gap-3 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-500 shadow-sm">
                   <span className="flex items-center gap-1.5">
                     <span className="size-2 rounded-full bg-zinc-900" />
-                    Profit
+                    Receita
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="size-2 rounded-full bg-orange-500" />
-                    Loss
+                    Despesa
                   </span>
                 </div>
               </div>
@@ -477,10 +386,10 @@ export default function DashboardEmpresa() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-zinc-900">
-                      Monthly Spending Limit
+                      Limite mensal de gastos
                     </p>
                     <p className="mt-1 text-sm text-zinc-500">
-                      {formatMoney(displaySpending)} spent out of{" "}
+                      {formatMoney(displaySpending)} gastos de{" "}
                       {formatMoney(spendingLimit)}
                     </p>
                   </div>
@@ -494,7 +403,7 @@ export default function DashboardEmpresa() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
-                  <span>{formatMoney(displaySpending)} spent out of</span>
+                  <span>{formatMoney(displaySpending)} gastos de</span>
                   <span>{formatMoney(spendingLimit)}</span>
                 </div>
               </CardContent>
@@ -505,14 +414,14 @@ export default function DashboardEmpresa() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base font-semibold text-zinc-900">
-                      My Cards
+                      Meus cartões
                     </CardTitle>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Active cards and featured cards.
+                      Cartões ativos e destacados.
                     </p>
                   </div>
                   <Button className="rounded-full border border-zinc-200 bg-white px-4 text-zinc-700 shadow-sm hover:bg-zinc-50">
-                    + Add new
+                    + Adicionar
                   </Button>
                 </div>
               </CardHeader>
@@ -539,13 +448,13 @@ export default function DashboardEmpresa() {
 
           <Card className={cn(panelClass, "border-zinc-200 py-0")}>
             <CardHeader className="p-5 pb-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold text-zinc-900">
-                    Recent Activities
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <CardTitle className="text-base font-semibold text-zinc-900">
+                    Atividades recentes
                   </CardTitle>
                   <p className="mt-1 text-sm text-zinc-500">
-                    Track purchases, bookings, and payments.
+                    Acompanhe receitas, custos, folha e movimentações da reserva.
                   </p>
                 </div>
 
@@ -555,86 +464,94 @@ export default function DashboardEmpresa() {
                     <Input
                       value={searchQuery}
                       onChange={event => setSearchQuery(event.target.value)}
-                      placeholder="Search"
+                      placeholder="Pesquisar"
                       className="h-10 rounded-full border-zinc-200 bg-white pl-9 text-sm text-zinc-900 placeholder:text-zinc-400 shadow-sm"
                     />
                   </div>
                   <Button className="h-10 rounded-full border border-zinc-200 bg-white px-4 text-zinc-700 shadow-sm hover:bg-zinc-50">
                     <SlidersHorizontal className="mr-2 size-4" />
-                    Filter
+                    Filtrar
                   </Button>
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="p-5 pt-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-200 hover:bg-transparent">
-                    <TableHead className="w-10 px-2 text-zinc-400">
-                      <Checkbox className="border-zinc-300 data-[state=checked]:border-zinc-900 data-[state=checked]:bg-zinc-900" />
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-200 hover:bg-transparent">
+                      <TableHead className="w-10 px-2 text-zinc-400">
+                        <Checkbox className="border-zinc-300 data-[state=checked]:border-zinc-900 data-[state=checked]:bg-zinc-900" />
                     </TableHead>
                       <TableHead className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">
-                        Order ID
+                        ID
                       </TableHead>
                       <TableHead className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">
-                        Activity
+                        Lançamento
                       </TableHead>
                       <TableHead className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">
-                        Price
+                        Valor
                       </TableHead>
                       <TableHead className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">
                         Status
                       </TableHead>
                       <TableHead className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">
-                        Date
+                        Data
                       </TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visibleActivities.map(activity => (
-                    <TableRow
-                      key={activity.orderId + activity.activity}
-                      className="border-zinc-100 hover:bg-zinc-50/80"
-                    >
-                      <TableCell className="px-2">
-                        <Checkbox className="border-zinc-300 data-[state=checked]:border-zinc-900 data-[state=checked]:bg-zinc-900" />
-                      </TableCell>
-                      <TableCell className="text-sm font-medium text-zinc-700">
-                        {activity.orderId}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <ActivityIcon icon={activity.icon} tone={activity.tone} />
-                          <div>
-                            <p className="text-sm font-medium text-zinc-900">
-                              {activity.activity}
-                            </p>
-                            <p className="text-xs text-zinc-500">Transaction</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm font-medium text-zinc-900">
-                        {formatMoney(activity.price)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusPill status={activity.status} />
-                      </TableCell>
-                      <TableCell className="text-sm text-zinc-500">
-                        {activity.date}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="size-8 rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
-                        >
-                          <EllipsisVertical className="size-4" />
-                        </Button>
+                  {visibleActivities.length === 0 ? (
+                    <TableRow className="border-zinc-100 hover:bg-transparent">
+                      <TableCell colSpan={7} className="py-10 text-center text-sm text-zinc-500">
+                        Nenhuma atividade encontrada neste período.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    visibleActivities.map(activity => (
+                      <TableRow
+                        key={activity.orderId + activity.activity}
+                        className="border-zinc-100 hover:bg-zinc-50/80"
+                      >
+                        <TableCell className="px-2">
+                          <Checkbox className="border-zinc-300 data-[state=checked]:border-zinc-900 data-[state=checked]:bg-zinc-900" />
+                        </TableCell>
+                        <TableCell className="text-sm font-medium text-zinc-700">
+                          {activity.orderId}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <ActivityIcon kind={activity.kind} tone={activity.tone} />
+                            <div>
+                              <p className="text-sm font-medium text-zinc-900">
+                                {activity.activity}
+                              </p>
+                              <p className="text-xs text-zinc-500">Lançamento</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm font-medium text-zinc-900">
+                          {formatMoney(activity.price)}
+                        </TableCell>
+                        <TableCell>
+                          <StatusPill status={activity.status} />
+                        </TableCell>
+                        <TableCell className="text-sm text-zinc-500">
+                          {activity.date}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-8 rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
+                          >
+                            <EllipsisVertical className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -784,7 +701,7 @@ function MetricCard({
             {deltaLabel}
           </span>
           <span className={highlighted ? "text-xs text-orange-50/90" : "text-xs text-zinc-400"}>
-            This month
+            Neste mês
           </span>
         </div>
       </CardContent>
@@ -848,7 +765,10 @@ function WalletMiniCard({ wallet }: { wallet: WalletItem }) {
       </div>
 
       <div className="mt-4 h-1.5 rounded-full bg-zinc-100">
-        <div className={cn("h-1.5 rounded-full", tone.bg)} style={{ width: "68%" }} />
+        <div
+          className={cn("h-1.5 rounded-full", tone.bg)}
+          style={{ width: `${Math.max(0, Math.min(wallet.progress, 100))}%` }}
+        />
       </div>
     </div>
   );
@@ -880,7 +800,7 @@ function CreditCardMock({
     >
       <div className="flex items-start justify-between gap-3">
         <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-white/90">
-          {active ? "Active" : "Inactive"}
+          {active ? "Ativo" : "Inativo"}
         </span>
 
         <div className="relative size-10">
@@ -894,7 +814,7 @@ function CreditCardMock({
           <div className="h-10 w-12 rounded-xl border border-white/20 bg-gradient-to-br from-white/70 to-white/30" />
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-[0.28em] text-white/60">
-              Card Number
+              Número do cartão
             </p>
             <p className="mt-1 text-base font-semibold tracking-[0.18em] text-white">
               {number}
@@ -906,7 +826,7 @@ function CreditCardMock({
       <div className="mt-6 grid grid-cols-3 gap-4">
         <div>
           <p className="text-[10px] uppercase tracking-[0.24em] text-white/55">
-            Exp
+            Val.
           </p>
           <p className="mt-1 text-sm font-medium text-white">{exp}</p>
         </div>
@@ -918,9 +838,9 @@ function CreditCardMock({
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-[0.24em] text-white/55">
-            Card
+            Cartão
           </p>
-          <p className="mt-1 text-sm font-medium text-white">Debit</p>
+          <p className="mt-1 text-sm font-medium text-white">Débito</p>
         </div>
       </div>
     </div>
@@ -929,9 +849,9 @@ function CreditCardMock({
 
 function StatusPill({ status }: { status: ActivityItem["status"] }) {
   const tone =
-    status === "Completed"
+    status === "Concluído"
       ? "bg-emerald-50 text-emerald-600"
-      : status === "Pending"
+      : status === "Pendente"
         ? "bg-rose-50 text-rose-600"
         : "bg-amber-50 text-amber-600";
 
@@ -945,9 +865,9 @@ function StatusPill({ status }: { status: ActivityItem["status"] }) {
       <span
         className={cn(
           "size-1.5 rounded-full",
-          status === "Completed"
+          status === "Concluído"
             ? "bg-emerald-500"
-            : status === "Pending"
+            : status === "Pendente"
               ? "bg-rose-500"
               : "bg-amber-500"
         )}
@@ -957,11 +877,23 @@ function StatusPill({ status }: { status: ActivityItem["status"] }) {
   );
 }
 
+const activityIconMap: Record<
+  ActivityItem["kind"],
+  { icon: LucideIcon }
+> = {
+  revenue: { icon: DollarSign },
+  fixedCost: { icon: Wallet },
+  variableCost: { icon: Receipt },
+  purchase: { icon: ShoppingCart },
+  payroll: { icon: CreditCard },
+  reserve: { icon: PiggyBank },
+};
+
 function ActivityIcon({
-  icon: Icon,
+  kind,
   tone,
 }: {
-  icon: LucideIcon;
+  kind: ActivityItem["kind"];
   tone: ActivityItem["tone"];
 }) {
   const colors: Record<
@@ -991,6 +923,7 @@ function ActivityIcon({
   };
 
   const color = colors[tone];
+  const Icon = activityIconMap[kind].icon;
 
   return (
     <div
@@ -1033,7 +966,7 @@ function ResponsiveBarChart({
           width={38}
           stroke="#a1a1aa"
           fontSize={12}
-          tickFormatter={value => `${Math.round(Number(value) / 1000)}k`}
+          tickFormatter={value => `${Math.round(Number(value) / 1000)} mil`}
         />
         <Tooltip
           cursor={{ fill: "transparent" }}
@@ -1047,7 +980,7 @@ function ResponsiveBarChart({
           itemStyle={{ color: "#52525b" }}
           formatter={(value: number | string, name: string) => [
             formatMoney(Number(value)),
-            name === "profit" ? "Profit" : "Loss",
+            name === "profit" ? "Receita" : "Despesa",
           ]}
         />
         <Bar dataKey="profit" fill="#1f1f1f" radius={[10, 10, 0, 0]} barSize={18} />

@@ -1,0 +1,1 @@
+ALTER TABLE "revenues" ADD COLUMN "seriesId" varchar(64);

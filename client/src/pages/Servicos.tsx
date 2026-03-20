@@ -14,10 +14,18 @@ import { toast } from "sonner";
 
 const UNITS = ["hora", "projeto", "mensal", "diária", "pacote"] as const;
 
-interface FormData { name: string; description: string; category: string; basePrice: string; unit: string; status: string; }
+const RECURRENCES = [
+  { value: "unico",      label: "Único (sem recorrência)" },
+  { value: "pacote3",    label: "Pacote 3 meses" },
+  { value: "mensal",     label: "Mensal (12 meses)" },
+  { value: "trimestral", label: "Trimestral" },
+  { value: "semestral",  label: "Semestral" },
+] as const;
+
+interface FormData { name: string; description: string; category: string; basePrice: string; unit: string; recurrence: string; status: string; }
 interface FormErrors { name?: string; basePrice?: string; }
 
-const EMPTY: FormData = { name: "", description: "", category: "", basePrice: "", unit: "projeto", status: "ativo" };
+const EMPTY: FormData = { name: "", description: "", category: "", basePrice: "", unit: "projeto", recurrence: "unico", status: "ativo" };
 
 function validate(f: FormData): FormErrors {
   const e: FormErrors = {};
@@ -46,7 +54,7 @@ export default function Servicos() {
 
   function openEdit(s: typeof services[0]) {
     setEditingId(s.id);
-    setForm({ name: s.name, description: s.description ?? "", category: s.category ?? "", basePrice: parseFloat(s.basePrice).toFixed(2), unit: s.unit, status: s.status });
+    setForm({ name: s.name, description: s.description ?? "", category: s.category ?? "", basePrice: parseFloat(s.basePrice).toFixed(2), unit: s.unit, recurrence: s.recurrence ?? "unico", status: s.status });
     setErrors({});
     setTouched({});
     setOpen(true);
@@ -76,6 +84,7 @@ export default function Servicos() {
       category: form.category || undefined,
       basePrice: parseFloat(form.basePrice).toFixed(2),
       unit: form.unit,
+      recurrence: form.recurrence,
       status: form.status,
     };
 
@@ -144,6 +153,18 @@ export default function Servicos() {
               </div>
             </div>
 
+            {/* Recorrência padrão */}
+            <div className="space-y-1">
+              <Label>Recorrência padrão</Label>
+              <Select value={form.recurrence} onValueChange={v => set("recurrence", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {RECURRENCES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Ao selecionar este serviço em uma receita, a recorrência será preenchida automaticamente.</p>
+            </div>
+
             {/* Preço + Status */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
@@ -200,6 +221,7 @@ export default function Servicos() {
                 <TableHead>Descrição</TableHead>
                 <TableHead className="text-right">Preço Base</TableHead>
                 <TableHead>Unidade</TableHead>
+                <TableHead>Recorrência</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[90px]"></TableHead>
               </TableRow>
@@ -216,6 +238,9 @@ export default function Servicos() {
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">{item.description || "-"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(item.basePrice)}</TableCell>
                   <TableCell>{item.unit}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {RECURRENCES.find(r => r.value === (item.recurrence ?? "unico"))?.label ?? "Único"}
+                  </TableCell>
                   <TableCell>
                     <button onClick={() => toggleStatus.mutate({ id: item.id, status: item.status === "ativo" ? "inativo" : "ativo" })}>
                       <Badge variant={item.status === "ativo" ? "default" : "secondary"}>{item.status}</Badge>

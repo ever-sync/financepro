@@ -67,6 +67,98 @@ function addMonthsToIsoDate(dateStr: string, offset: number) {
   return `${String(targetYear).padStart(4, "0")}-${String(targetMonthIndex + 1).padStart(2, "0")}-${String(targetDay).padStart(2, "0")}`;
 }
 
+const DASHBOARD_MONTH_LABELS = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
+
+function toNumber(value: string | number | null | undefined) {
+  const parsed = typeof value === "string" ? Number.parseFloat(value) : Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseDateParts(value?: string | null) {
+  if (!value) return null;
+  const [yearPart, monthPart, dayPart] = value.split("-").map(Number);
+  if (!yearPart || !monthPart || !dayPart) return null;
+  return { year: yearPart, month: monthPart, day: dayPart };
+}
+
+function monthSerial(year: number, month: number) {
+  return year * 12 + month;
+}
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function shiftMonth(month: number, year: number, offset: number) {
+  const shifted = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+  };
+}
+
+function buildRollingMonths(month: number, year: number, count = 8) {
+  return Array.from({ length: count }, (_, index) => {
+    const shifted = shiftMonth(month, year, index - count + 1);
+    return {
+      ...shifted,
+      key: monthKey(shifted.year, shifted.month),
+      label: DASHBOARD_MONTH_LABELS[shifted.month - 1] ?? `M${shifted.month}`,
+    };
+  });
+}
+
+function isSameMonthYear(value: string | null | undefined, month: number, year: number) {
+  const parts = parseDateParts(value);
+  return parts ? parts.month === month && parts.year === year : false;
+}
+
+function isOnOrBeforeMonthYear(value: string | null | undefined, month: number, year: number) {
+  const parts = parseDateParts(value);
+  return parts ? monthSerial(parts.year, parts.month) <= monthSerial(year, month) : false;
+}
+
+function formatDashboardDate(month: number, year: number, day: number) {
+  return `${String(day).padStart(2, "0")} ${DASHBOARD_MONTH_LABELS[month - 1] ?? `M${month}`}, ${year}`;
+}
+
+type DashboardWallet = {
+  code: string;
+  label: string;
+  amount: number;
+  status: "Ativa" | "Inativa";
+  tone: "emerald" | "amber" | "slate";
+  progress: number;
+};
+
+type DashboardActivity = {
+  orderId: string;
+  activity: string;
+  price: number;
+  status: "Concluído" | "Pendente" | "Em andamento";
+  date: string;
+  kind: "revenue" | "fixedCost" | "variableCost" | "purchase" | "payroll" | "reserve";
+  tone: "emerald" | "rose" | "amber" | "blue";
+  sortKey: number;
+};
+
+function getActivitySortKey(year: number, month: number, day: number) {
+  return monthSerial(year, month) * 100 + day;
+}
+
 // ==================== USERS ====================
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
@@ -150,6 +242,18 @@ export async function deleteRevenue(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(revenues).where(and(eq(revenues.id, id), eq(revenues.userId, userId)));
+}
+
+export async function deleteRevenueSeries(seriesId: string, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(revenues).where(and(eq(revenues.seriesId, seriesId), eq(revenues.userId, userId)));
+}
+
+export async function updateRevenueSeries(seriesId: string, userId: number, data: Partial<InsertRevenue>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(revenues).set(data).where(and(eq(revenues.seriesId, seriesId), eq(revenues.userId, userId)));
 }
 
 // ==================== COMPANY FIXED COSTS ====================
@@ -546,66 +650,351 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
   const db = await getDb();
   if (!db) return null;
 
-  const [revenueData] = await db.select({
-    totalGross: sql<string>`COALESCE(SUM(${revenues.grossAmount}), 0)`,
-    totalTax: sql<string>`COALESCE(SUM(${revenues.taxAmount}), 0)`,
-    totalNet: sql<string>`COALESCE(SUM(${revenues.netAmount}), 0)`,
-    count: sql<number>`COUNT(*)`,
-  }).from(revenues).where(and(
-    eq(revenues.userId, userId),
-    sql`EXTRACT(MONTH FROM ${revenues.dueDate}::date) = ${month}`,
-    sql`EXTRACT(YEAR FROM ${revenues.dueDate}::date) = ${year}`
-  ));
+  // Ensure month-specific fixed costs are hydrated before we read the broader timeline.
+  const currentFixedCosts = await getCompanyFixedCosts(userId, month, year);
 
-  const [fixedCostsData] = await db.select({
-    total: sql<string>`COALESCE(SUM(${companyFixedCosts.amount}), 0)`,
-    paid: sql<string>`COALESCE(SUM(CASE WHEN ${companyFixedCosts.status} = 'pago' THEN ${companyFixedCosts.amount} ELSE 0 END), 0)`,
-  }).from(companyFixedCosts).where(and(
-    eq(companyFixedCosts.userId, userId),
-    eq(companyFixedCosts.month, month),
-    eq(companyFixedCosts.year, year)
-  ));
+  const [
+    revenueRows,
+    allFixedCosts,
+    variableCostRows,
+    employeeRows,
+    purchaseRows,
+    reserveRows,
+    supplierRows,
+    userSettings,
+  ] = await Promise.all([
+    getRevenues(userId),
+    getCompanyFixedCosts(userId),
+    getCompanyVariableCosts(userId),
+    getEmployees(userId),
+    getSupplierPurchases(userId),
+    getReserveFunds(userId, "empresa"),
+    getSuppliers(userId),
+    getSettings(userId),
+  ]);
 
-  const [varCostsData] = await db.select({
-    total: sql<string>`COALESCE(SUM(${companyVariableCosts.amount}), 0)`,
-  }).from(companyVariableCosts).where(and(
-    eq(companyVariableCosts.userId, userId),
-    sql`EXTRACT(MONTH FROM ${companyVariableCosts.date}::date) = ${month}`,
-    sql`EXTRACT(YEAR FROM ${companyVariableCosts.date}::date) = ${year}`
-  ));
+  const selectedSerial = monthSerial(year, month);
+  const currentDate = new Date();
+  const currentSerial = monthSerial(currentDate.getFullYear(), currentDate.getMonth() + 1);
+  const proLabore = toNumber(userSettings?.proLaboreGross);
+  const supplierById = new Map(supplierRows.map(supplier => [supplier.id, supplier.name]));
 
-  const [employeesData] = await db.select({
-    totalCost: sql<string>`COALESCE(SUM(${employees.totalCost}), 0)`,
-    count: sql<number>`COUNT(*)`,
-  }).from(employees).where(and(
-    eq(employees.userId, userId),
-    eq(employees.status, "ativo")
-  ));
+  const activeEmployees = employeeRows
+    .filter(employee => employee.status === "ativo")
+    .map(employee => {
+      const admissionParts = parseDateParts(employee.admissionDate);
+      return {
+        employee,
+        admissionSerial: admissionParts ? monthSerial(admissionParts.year, admissionParts.month) : null,
+      };
+    });
 
-  const [purchasesData] = await db.select({
-    total: sql<string>`COALESCE(SUM(${supplierPurchases.amount}), 0)`,
-  }).from(supplierPurchases).where(and(
-    eq(supplierPurchases.userId, userId),
-    sql`EXTRACT(MONTH FROM ${supplierPurchases.dueDate}::date) = ${month}`,
-    sql`EXTRACT(YEAR FROM ${supplierPurchases.dueDate}::date) = ${year}`
-  ));
+  const monthlySnapshots = buildRollingMonths(month, year, 8).map(({ year: targetYear, month: targetMonth, label }) => {
+    const targetSerial = monthSerial(targetYear, targetMonth);
+    const monthRevenueRows = revenueRows.filter(row => isSameMonthYear(row.dueDate, targetMonth, targetYear));
+    const monthFixedRows = allFixedCosts.filter(row => row.month === targetMonth && row.year === targetYear);
+    const monthVariableRows = variableCostRows.filter(row => isSameMonthYear(row.date, targetMonth, targetYear));
+    const monthPurchaseRows = purchaseRows.filter(row => isSameMonthYear(row.dueDate, targetMonth, targetYear));
+    const employeesForMonth = activeEmployees.filter(snapshot => snapshot.admissionSerial === null || snapshot.admissionSerial <= targetSerial);
+    const reserveBalance = reserveRows.reduce((sum, row) => {
+      const parts = parseDateParts(row.date);
+      if (!parts) return sum;
+      return monthSerial(parts.year, parts.month) <= targetSerial ? sum + toNumber(row.depositAmount) : sum;
+    }, 0);
 
-  const [reserveData] = await db.select({
-    total: sql<string>`COALESCE(SUM(${reserveFunds.depositAmount}), 0)`,
-  }).from(reserveFunds).where(and(
-    eq(reserveFunds.userId, userId),
-    eq(reserveFunds.type, "empresa")
-  ));
+    const grossRevenue = monthRevenueRows.reduce((sum, row) => sum + toNumber(row.grossAmount), 0);
+    const taxAmount = monthRevenueRows.reduce((sum, row) => sum + toNumber(row.taxAmount), 0);
+    const netRevenue = monthRevenueRows.reduce((sum, row) => sum + toNumber(row.netAmount), 0);
+    const fixedCostsTotal = monthFixedRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+    const variableCostsTotal = monthVariableRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+    const employeeCosts = employeesForMonth.reduce((sum, snapshot) => sum + toNumber(snapshot.employee.totalCost), 0);
+    const purchaseCosts = monthPurchaseRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+    const spending = fixedCostsTotal + variableCostsTotal + employeeCosts + purchaseCosts + proLabore;
+    const profit = netRevenue - spending;
+    const balance = profit + reserveBalance;
 
-  const userSettings = await getSettings(userId);
+    return {
+      key: `${targetYear}-${String(targetMonth).padStart(2, "0")}`,
+      month: label,
+      grossRevenue,
+      taxAmount,
+      netRevenue,
+      fixedCosts: fixedCostsTotal,
+      variableCosts: variableCostsTotal,
+      employeeCosts,
+      purchases: purchaseCosts,
+      reserve: reserveBalance,
+      spending,
+      profit,
+      balance,
+    };
+  });
+
+  const currentSnapshot = monthlySnapshots[monthlySnapshots.length - 1];
+  const previousSnapshot = monthlySnapshots[monthlySnapshots.length - 2] ?? currentSnapshot;
+
+  const currentRevenueRows = revenueRows.filter(row => isSameMonthYear(row.dueDate, month, year));
+  const currentVariableRows = variableCostRows.filter(row => isSameMonthYear(row.date, month, year));
+  const currentPurchaseRows = purchaseRows.filter(row => isSameMonthYear(row.dueDate, month, year));
+  const currentReserveRows = reserveRows.filter(row => isSameMonthYear(row.date, month, year));
+  const currentEmployees = activeEmployees.filter(snapshot => snapshot.admissionSerial === null || snapshot.admissionSerial <= selectedSerial);
+
+  const currentFixedCostsTotal = currentFixedCosts.reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const currentFixedCostsPaid = currentFixedCosts.reduce(
+    (sum, row) => sum + (row.status === "pago" ? toNumber(row.amount) : 0),
+    0
+  );
+  const currentRevenueGross = currentRevenueRows.reduce((sum, row) => sum + toNumber(row.grossAmount), 0);
+  const currentRevenueTax = currentRevenueRows.reduce((sum, row) => sum + toNumber(row.taxAmount), 0);
+  const currentRevenueNet = currentRevenueRows.reduce((sum, row) => sum + toNumber(row.netAmount), 0);
+  const currentVariableCostsTotal = currentVariableRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const currentEmployeeTotalCost = currentEmployees.reduce((sum, snapshot) => sum + toNumber(snapshot.employee.totalCost), 0);
+  const currentPurchaseTotal = currentPurchaseRows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const currentReserveBalance = currentSnapshot?.reserve ?? 0;
+  const currentSpending = currentFixedCostsTotal + currentVariableCostsTotal + currentEmployeeTotalCost + currentPurchaseTotal + proLabore;
+  const currentProfit = currentRevenueNet - currentSpending;
+  const currentBalance = currentProfit + currentReserveBalance;
+
+  const previousRevenueGross = previousSnapshot?.grossRevenue ?? 0;
+  const previousRevenueTax = previousSnapshot?.taxAmount ?? 0;
+  const previousRevenueNet = previousSnapshot?.netRevenue ?? 0;
+  const previousFixedCostsTotal = previousSnapshot?.fixedCosts ?? 0;
+  const previousVariableCostsTotal = previousSnapshot?.variableCosts ?? 0;
+  const previousEmployeeTotalCost = previousSnapshot?.employeeCosts ?? 0;
+  const previousPurchaseTotal = previousSnapshot?.purchases ?? 0;
+  const previousReserveBalance = previousSnapshot?.reserve ?? 0;
+  const previousSpending = previousSnapshot?.spending ?? 0;
+  const previousProfit = previousSnapshot?.profit ?? 0;
+  const previousBalance = previousSnapshot?.balance ?? 0;
+
+  const walletBase: DashboardWallet[] = [
+    {
+      code: "CX",
+      label: "Saldo operacional",
+      amount: currentProfit,
+      status: currentProfit >= 0 ? "Ativa" : "Inativa",
+      tone: "emerald",
+      progress: 0,
+    },
+    {
+      code: "RES",
+      label: "Fundo de reserva",
+      amount: currentReserveBalance,
+      status: currentReserveBalance > 0 ? "Ativa" : "Inativa",
+      tone: "amber",
+      progress: 0,
+    },
+    {
+      code: "CMP",
+      label: "Compromissos em aberto",
+      amount: currentSpending,
+      status: currentSpending > 0 ? "Inativa" : "Ativa",
+      tone: "slate",
+      progress: 0,
+    },
+  ];
+  const walletScale = Math.max(...walletBase.map(wallet => Math.abs(wallet.amount)), 1);
+  const wallets = walletBase.map(wallet => ({
+    ...wallet,
+    progress: Math.min((Math.abs(wallet.amount) / walletScale) * 100, 100),
+  }));
+
+  const activityPriority: Record<DashboardActivity["kind"], number> = {
+    revenue: 5,
+    reserve: 4,
+    payroll: 3,
+    purchase: 2,
+    fixedCost: 1,
+    variableCost: 0,
+  };
+  const activities: DashboardActivity[] = [];
+
+  const toStatus = (status: string | null | undefined): DashboardActivity["status"] => {
+    if (status === "pago" || status === "recebido") return "Concluído";
+    if (status === "atrasado") return "Em andamento";
+    return "Pendente";
+  };
+
+  for (const row of currentRevenueRows) {
+    const parts = parseDateParts(row.receivedDate ?? row.dueDate);
+    if (!parts) continue;
+    activities.push({
+      orderId: `REV-${String(row.id).padStart(6, "0")}`,
+      kind: "revenue",
+      activity: row.client ? `${row.description} - ${row.client}` : row.description,
+      price: toNumber(row.netAmount),
+      status: toStatus(row.status),
+      date: formatDashboardDate(parts.month, parts.year, parts.day),
+      tone: row.status === "atrasado" ? "amber" : row.status === "recebido" ? "emerald" : "emerald",
+      sortKey: getActivitySortKey(parts.year, parts.month, parts.day) * 10 + activityPriority.revenue,
+    });
+  }
+
+  for (const row of currentFixedCosts) {
+    const parts = { year, month, day: Math.min(row.dueDay, new Date(Date.UTC(year, month, 0)).getUTCDate()) };
+    activities.push({
+      orderId: `FIX-${String(row.id).padStart(6, "0")}`,
+      kind: "fixedCost",
+      activity: row.description,
+      price: toNumber(row.amount),
+      status: toStatus(row.status),
+      date: formatDashboardDate(parts.month, parts.year, parts.day),
+      tone: row.status === "atrasado" ? "amber" : row.status === "pago" ? "blue" : "blue",
+      sortKey: getActivitySortKey(parts.year, parts.month, parts.day) * 10 + activityPriority.fixedCost,
+    });
+  }
+
+  for (const row of currentVariableRows) {
+    const parts = parseDateParts(row.date);
+    if (!parts) continue;
+    const installmentSuffix = row.installmentCount > 1 ? ` (${row.installmentNumber}/${row.installmentCount})` : "";
+    activities.push({
+      orderId: `VAR-${String(row.id).padStart(6, "0")}`,
+      kind: "variableCost",
+      activity: `${row.description}${installmentSuffix}`,
+      price: toNumber(row.amount),
+      status: toStatus(row.status),
+      date: formatDashboardDate(parts.month, parts.year, parts.day),
+      tone: row.status === "atrasado" ? "amber" : row.status === "pago" ? "amber" : "amber",
+      sortKey: getActivitySortKey(parts.year, parts.month, parts.day) * 10 + activityPriority.variableCost,
+    });
+  }
+
+  const supplierMap = supplierById;
+  for (const row of currentPurchaseRows) {
+    const parts = parseDateParts(row.dueDate);
+    if (!parts) continue;
+    const supplierName = supplierMap.get(row.supplierId);
+    activities.push({
+      orderId: `PUR-${String(row.id).padStart(6, "0")}`,
+      kind: "purchase",
+      activity: supplierName ? `${supplierName} - ${row.description}` : row.description,
+      price: toNumber(row.amount),
+      status: toStatus(row.status),
+      date: formatDashboardDate(parts.month, parts.year, parts.day),
+      tone: row.status === "atrasado" ? "amber" : row.status === "pago" ? "rose" : "rose",
+      sortKey: getActivitySortKey(parts.year, parts.month, parts.day) * 10 + activityPriority.purchase,
+    });
+  }
+
+  for (const snapshot of currentEmployees) {
+    const paymentDay = Math.min(snapshot.employee.paymentDay ?? 5, new Date(Date.UTC(year, month, 0)).getUTCDate());
+    const payrollStatus =
+      selectedSerial < currentSerial
+        ? "Concluído"
+        : selectedSerial > currentSerial
+          ? "Pendente"
+          : paymentDay < currentDate.getDate()
+            ? "Em andamento"
+            : "Pendente";
+    activities.push({
+      orderId: `PAY-${String(snapshot.employee.id).padStart(6, "0")}`,
+      kind: "payroll",
+      activity: `Folha de pagamento - ${snapshot.employee.name}`,
+      price: toNumber(snapshot.employee.totalCost),
+      status: payrollStatus,
+      date: formatDashboardDate(year, month, paymentDay),
+      tone: payrollStatus === "Concluído" ? "emerald" : "amber",
+      sortKey: getActivitySortKey(year, month, paymentDay) * 10 + activityPriority.payroll,
+    });
+  }
+
+  for (const row of currentReserveRows) {
+    const parts = parseDateParts(row.date);
+    if (!parts) continue;
+    activities.push({
+      orderId: `RES-${String(row.id).padStart(6, "0")}`,
+      kind: "reserve",
+      activity: row.description || "Depósito na reserva",
+      price: toNumber(row.depositAmount),
+      status: "Concluído",
+      date: formatDashboardDate(parts.month, parts.year, parts.day),
+      tone: "emerald",
+      sortKey: getActivitySortKey(parts.year, parts.month, parts.day) * 10 + activityPriority.reserve,
+    });
+  }
+
+  activities.sort((left, right) => {
+    if (right.sortKey !== left.sortKey) return right.sortKey - left.sortKey;
+    return right.price - left.price;
+  });
+
+  const chartSeries = monthlySnapshots.map(snapshot => ({
+    month: snapshot.month,
+    profit: snapshot.netRevenue,
+    loss: snapshot.spending,
+  }));
+
+  const currentTotalFixedCosts = currentSnapshot?.fixedCosts ?? currentFixedCostsTotal;
+  const currentTotalVariableCosts = currentSnapshot?.variableCosts ?? currentVariableCostsTotal;
+  const currentTotalEmployees = currentSnapshot?.employeeCosts ?? currentEmployeeTotalCost;
+  const currentTotalPurchases = currentSnapshot?.purchases ?? currentPurchaseTotal;
 
   return {
-    revenue: revenueData,
-    fixedCosts: fixedCostsData,
-    variableCosts: varCostsData,
-    employees: employeesData,
-    purchases: purchasesData,
-    reserve: reserveData,
+    revenue: {
+      items: currentRevenueRows,
+      totalGross: currentRevenueGross.toFixed(2),
+      totalTax: currentRevenueTax.toFixed(2),
+      totalNet: currentRevenueNet.toFixed(2),
+      count: currentRevenueRows.length,
+    },
+    fixedCosts: {
+      items: currentFixedCosts,
+      total: currentTotalFixedCosts.toFixed(2),
+      paid: currentFixedCostsPaid.toFixed(2),
+      count: currentFixedCosts.length,
+    },
+    variableCosts: {
+      items: currentVariableRows,
+      total: currentTotalVariableCosts.toFixed(2),
+      count: currentVariableRows.length,
+    },
+    employees: {
+      items: currentEmployees.map(snapshot => snapshot.employee),
+      totalCost: currentTotalEmployees.toFixed(2),
+      count: currentEmployees.length,
+    },
+    purchases: {
+      items: currentPurchaseRows,
+      total: currentTotalPurchases.toFixed(2),
+      count: currentPurchaseRows.length,
+    },
+    reserve: {
+      items: currentReserveRows,
+      total: currentReserveBalance.toFixed(2),
+      count: currentReserveRows.length,
+    },
+    wallets,
+    activities: activities.slice(0, 6).map(({ sortKey, ...activity }) => activity),
+    chartSeries,
+    summary: {
+      current: {
+        grossRevenue: currentRevenueGross,
+        taxAmount: currentRevenueTax,
+        netRevenue: currentRevenueNet,
+        fixedCosts: currentTotalFixedCosts,
+        variableCosts: currentTotalVariableCosts,
+        employeeCosts: currentTotalEmployees,
+        purchases: currentTotalPurchases,
+        reserve: currentReserveBalance,
+        spending: currentSpending,
+        profit: currentProfit,
+        balance: currentBalance,
+      },
+      previous: {
+        grossRevenue: previousRevenueGross,
+        taxAmount: previousRevenueTax,
+        netRevenue: previousRevenueNet,
+        fixedCosts: previousFixedCostsTotal,
+        variableCosts: previousVariableCostsTotal,
+        employeeCosts: previousEmployeeTotalCost,
+        purchases: previousPurchaseTotal,
+        reserve: previousReserveBalance,
+        spending: previousSpending,
+        profit: previousProfit,
+        balance: previousBalance,
+      },
+    },
     settings: userSettings,
   };
 }

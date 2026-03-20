@@ -8,26 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Pencil, Loader2 } from "lucide-react";
+import { Plus, Trash2, Pencil, Loader2, Link2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 const categories = ["Serviço", "Produto", "Consultoria", "Projeto", "Comissão", "Outros"];
 
 interface FormState {
-  description: string;
-  category: string;
-  grossAmount: string;
-  client: string;
-  dueDate: string;
-  status: string;
+  description: string; category: string; grossAmount: string;
+  client: string; dueDate: string; status: string;
 }
-
 const EMPTY: FormState = { description: "", category: "", grossAmount: "", client: "", dueDate: "", status: "pendente" };
 
-// Gera array de datas deslocadas por mês conforme recorrência
 function buildRecurrenceDates(startDate: string, recurrence: string): string[] {
   if (!startDate || recurrence === "unico") return [startDate];
   const cfg: Record<string, { count: number; step: number }> = {
@@ -52,29 +46,36 @@ export default function Receitas() {
   const { data: clients = [] } = trpc.clients.list.useQuery();
   const { data: services = [] } = trpc.services.list.useQuery();
 
-  const createMutation = trpc.revenues.create.useMutation();
-  const updateMutation = trpc.revenues.update.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita atualizada"); closeDialog(); } });
-  const deleteMutation = trpc.revenues.delete.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita removida"); } });
+  const createMutation    = trpc.revenues.create.useMutation();
+  const updateMutation    = trpc.revenues.update.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita atualizada"); closeDialog(); } });
+  const updateSeriesMut   = trpc.revenues.updateSeries.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Toda a série atualizada"); closeDialog(); setSeriesEditDialog(null); } });
+  const deleteMutation    = trpc.revenues.delete.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita removida"); setDeleteDialog(null); } });
+  const deleteSeriesMut   = trpc.revenues.deleteSeries.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Série removida"); setDeleteDialog(null); } });
 
-  const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY);
+  // ── form state ──
+  const [open, setOpen]               = useState(false);
+  const [editingItem, setEditingItem] = useState<typeof items[0] | null>(null);
+  const [form, setForm]               = useState<FormState>(EMPTY);
   const [selectedService, setSelectedService] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [recurrence, setRecurrence] = useState("unico");
-  const [submitting, setSubmitting] = useState(false);
+  const [quantity, setQuantity]       = useState("1");
+  const [recurrence, setRecurrence]   = useState("unico");
+  const [submitting, setSubmitting]   = useState(false);
+
+  // ── series dialogs ──
+  const [deleteDialog, setDeleteDialog]       = useState<typeof items[0] | null>(null);
+  const [seriesEditDialog, setSeriesEditDialog] = useState<{ payload: Parameters<typeof updateMutation.mutate>[0]; seriesId: string } | null>(null);
 
   const taxRate = parseFloat(settings?.taxPercent || "6") / 100;
 
   const closeDialog = () => {
-    setOpen(false); setEditingId(null); setForm(EMPTY);
+    setOpen(false); setEditingItem(null); setForm(EMPTY);
     setSelectedService(""); setQuantity("1"); setRecurrence("unico");
   };
 
-  const openCreate = () => { setEditingId(null); setForm(EMPTY); setSelectedService(""); setQuantity("1"); setRecurrence("unico"); setOpen(true); };
+  const openCreate = () => { setEditingItem(null); setForm(EMPTY); setSelectedService(""); setQuantity("1"); setRecurrence("unico"); setOpen(true); };
 
   const openEdit = (item: typeof items[0]) => {
-    setEditingId(item.id);
+    setEditingItem(item);
     setForm({ description: item.description, category: item.category, grossAmount: parseFloat(item.grossAmount).toFixed(2), client: item.client ?? "", dueDate: item.dueDate, status: item.status });
     setSelectedService(""); setQuantity("1"); setRecurrence("unico");
     setOpen(true);
@@ -82,9 +83,8 @@ export default function Receitas() {
 
   const set = (field: keyof FormState, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
-  // Serviço selecionado (para saber a unidade)
   const selectedSvc = services.find(s => String(s.id) === selectedService);
-  const isHourly = selectedSvc?.unit === "hora";
+  const isHourly    = selectedSvc?.unit === "hora";
 
   const handleServiceChange = (val: string) => {
     setSelectedService(val);
@@ -92,33 +92,27 @@ export default function Receitas() {
     if (val === "__none__") { setSelectedService(""); return; }
     const svc = services.find(s => String(s.id) === val);
     if (svc) {
-      setForm(prev => ({
-        ...prev,
-        description: svc.name,
-        grossAmount: parseFloat(svc.basePrice).toFixed(2),
-        category: prev.category || "Serviço",
-      }));
+      setForm(prev => ({ ...prev, description: svc.name, grossAmount: parseFloat(svc.basePrice).toFixed(2), category: prev.category || "Serviço" }));
+      setRecurrence(svc.recurrence ?? "unico");
     }
   };
 
   const handleQuantityChange = (val: string) => {
     setQuantity(val);
-    if (selectedSvc && val) {
-      const total = parseFloat(selectedSvc.basePrice) * (parseFloat(val) || 0);
-      setForm(prev => ({ ...prev, grossAmount: total.toFixed(2) }));
-    }
+    if (selectedSvc && val) setForm(prev => ({ ...prev, grossAmount: (parseFloat(selectedSvc.basePrice) * (parseFloat(val) || 0)).toFixed(2) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const gross = parseFloat(form.grossAmount) || 0;
-    const tax = gross * taxRate;
-    const net = gross - tax;
+    const gross  = parseFloat(form.grossAmount) || 0;
+    const tax    = gross * taxRate;
+    const net    = gross - tax;
     const client = (form.client && form.client !== "__none__") ? form.client : undefined;
 
-    if (editingId !== null) {
-      updateMutation.mutate({
-        id: editingId,
+    // ── EDIÇÃO ──
+    if (editingItem !== null) {
+      const payload = {
+        id: editingItem.id,
         description: form.description,
         category: form.category,
         grossAmount: gross.toFixed(2),
@@ -127,49 +121,45 @@ export default function Receitas() {
         client: client ?? null,
         dueDate: form.dueDate,
         status: form.status as any,
-      });
+      };
+      // Se pertence a uma série, perguntar o escopo
+      if (editingItem.seriesId) {
+        setSeriesEditDialog({ payload, seriesId: editingItem.seriesId });
+        return;
+      }
+      updateMutation.mutate(payload);
       return;
     }
 
-    // Criação com recorrência
-    const dates = buildRecurrenceDates(form.dueDate, recurrence);
+    // ── CRIAÇÃO com recorrência ──
+    const dates     = buildRecurrenceDates(form.dueDate, recurrence);
+    const seriesId  = dates.length > 1 ? crypto.randomUUID() : undefined;
     setSubmitting(true);
     try {
       await Promise.all(dates.map(dueDate =>
-        createMutation.mutateAsync({
-          description: form.description,
-          category: form.category,
-          grossAmount: gross.toFixed(2),
-          taxAmount: tax.toFixed(2),
-          netAmount: net.toFixed(2),
-          client,
-          dueDate,
-          status: "pendente",
-        })
+        createMutation.mutateAsync({ description: form.description, category: form.category, grossAmount: gross.toFixed(2), taxAmount: tax.toFixed(2), netAmount: net.toFixed(2), client, dueDate, status: "pendente", seriesId })
       ));
       utils.revenues.list.invalidate();
-      toast.success(dates.length > 1 ? `${dates.length} receitas criadas` : "Receita adicionada");
+      toast.success(dates.length > 1 ? `${dates.length} receitas criadas e vinculadas` : "Receita adicionada");
       closeDialog();
-    } catch {
-      toast.error("Erro ao salvar");
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { toast.error("Erro ao salvar"); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleDelete = (item: typeof items[0]) => {
+    if (item.seriesId) { setDeleteDialog(item); return; }
+    deleteMutation.mutate({ id: item.id });
   };
 
   const toggleStatus = (item: typeof items[0]) => {
     const next = item.status === "recebido" ? "pendente" : "recebido";
-    updateMutation.mutate({
-      id: item.id,
-      status: next,
-      receivedDate: next === "recebido" ? new Date().toISOString().split("T")[0] : null,
-    });
+    updateMutation.mutate({ id: item.id, status: next, receivedDate: next === "recebido" ? new Date().toISOString().split("T")[0] : null });
   };
 
-  const isPending = submitting || updateMutation.isPending;
-  const gross = parseFloat(form.grossAmount) || 0;
-  const totalGross = items.reduce((s, i) => s + parseFloat(i.grossAmount), 0);
-  const totalNet = items.reduce((s, i) => s + parseFloat(i.netAmount), 0);
+  const isPending   = submitting || updateMutation.isPending || updateSeriesMut.isPending;
+  const gross       = parseFloat(form.grossAmount) || 0;
+  const totalGross  = items.reduce((s, i) => s + parseFloat(i.grossAmount), 0);
+  const totalNet    = items.reduce((s, i) => s + parseFloat(i.netAmount), 0);
   const totalReceived = items.filter(i => i.status === "recebido").reduce((s, i) => s + parseFloat(i.grossAmount), 0);
 
   return (
@@ -185,17 +175,15 @@ export default function Receitas() {
         </div>
       </div>
 
-      {/* ── Dialog ── */}
+      {/* ────── Dialog cadastro/edição ────── */}
       <Dialog open={open} onOpenChange={v => !v && closeDialog()}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingId !== null ? "Editar Receita" : "Nova Receita"}</DialogTitle>
+            <DialogTitle>{editingItem ? "Editar Receita" : "Nova Receita"}</DialogTitle>
           </DialogHeader>
-
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
 
-            {/* Serviço — só no cadastro */}
-            {editingId === null && (
+            {!editingItem && (
               <div className="space-y-1">
                 <Label>Serviço</Label>
                 <Select value={selectedService} onValueChange={handleServiceChange}>
@@ -203,43 +191,29 @@ export default function Receitas() {
                   <SelectContent>
                     <SelectItem value="__none__">Sem serviço</SelectItem>
                     {services.filter(s => s.status === "ativo").map(s => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        {s.name} — {formatCurrency(s.basePrice)}/{s.unit}
-                      </SelectItem>
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name} — {formatCurrency(s.basePrice)}/{s.unit}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {/* Quantidade de horas — só quando serviço é por hora */}
-            {editingId === null && isHourly && (
+            {!editingItem && isHourly && (
               <div className="space-y-1">
                 <Label>Horas neste mês</Label>
                 <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={quantity}
-                    onChange={e => handleQuantityChange(e.target.value)}
-                    className="w-32"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    × {formatCurrency(selectedSvc!.basePrice)}/h = <span className="font-medium text-foreground">{formatCurrency(gross)}</span>
-                  </span>
+                  <Input type="number" min="0.5" step="0.5" value={quantity} onChange={e => handleQuantityChange(e.target.value)} className="w-32" />
+                  <span className="text-sm text-muted-foreground">× {formatCurrency(selectedSvc!.basePrice)}/h = <span className="font-medium text-foreground">{formatCurrency(gross)}</span></span>
                 </div>
               </div>
             )}
 
-            {/* Descrição */}
             <div className="space-y-1">
               <Label>Descrição</Label>
               <Input value={form.description} onChange={e => set("description", e.target.value)} required />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Categoria */}
               <div className="space-y-1">
                 <Label>Categoria</Label>
                 <Select value={form.category} onValueChange={v => set("category", v)} required>
@@ -247,20 +221,10 @@ export default function Receitas() {
                   <SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-
-              {/* Valor Bruto — desabilitado se horário (calculado pela qtde) */}
               <div className="space-y-1">
                 <Label>Valor Bruto (R$)</Label>
-                <Input
-                  type="number" step="0.01"
-                  value={form.grossAmount}
-                  onChange={e => set("grossAmount", e.target.value)}
-                  disabled={isHourly && editingId === null}
-                  required
-                />
+                <Input type="number" step="0.01" value={form.grossAmount} onChange={e => set("grossAmount", e.target.value)} disabled={isHourly && !editingItem} required />
               </div>
-
-              {/* Cliente */}
               <div className="space-y-1">
                 <Label>Cliente</Label>
                 <Select value={form.client || "__none__"} onValueChange={v => set("client", v === "__none__" ? "" : v)}>
@@ -271,15 +235,11 @@ export default function Receitas() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Data Vencimento */}
               <div className="space-y-1">
                 <Label>Data Vencimento</Label>
                 <Input type="date" value={form.dueDate} onChange={e => set("dueDate", e.target.value)} required />
               </div>
-
-              {/* Status — só na edição */}
-              {editingId !== null && (
+              {editingItem && (
                 <div className="space-y-1 md:col-span-2">
                   <Label>Status</Label>
                   <Select value={form.status} onValueChange={v => set("status", v)}>
@@ -294,8 +254,7 @@ export default function Receitas() {
               )}
             </div>
 
-            {/* Recorrência — só no cadastro */}
-            {editingId === null && (
+            {!editingItem && (
               <div className="space-y-1 border-t pt-4">
                 <Label>Recorrência</Label>
                 <Select value={recurrence} onValueChange={setRecurrence}>
@@ -310,16 +269,21 @@ export default function Receitas() {
                 </Select>
                 {recurrence !== "unico" && (
                   <p className="text-xs text-muted-foreground pt-1">
-                    {recurrence === "pacote3"    && "Serão criadas 3 receitas: mês atual, +1 e +2 meses."}
-                    {recurrence === "mensal"     && "Serão criadas 12 receitas, uma por mês."}
-                    {recurrence === "trimestral" && "Serão criadas 4 receitas: mês atual + 3, +6, +9 meses."}
-                    {recurrence === "semestral"  && "Serão criadas 2 receitas: mês atual + 6 meses."}
+                    {recurrence === "pacote3"    && "3 receitas criadas e vinculadas entre si."}
+                    {recurrence === "mensal"     && "12 receitas mensais criadas e vinculadas entre si."}
+                    {recurrence === "trimestral" && "4 receitas trimestrais criadas e vinculadas entre si."}
+                    {recurrence === "semestral"  && "2 receitas semestrais criadas e vinculadas entre si."}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Preview imposto */}
+            {editingItem?.seriesId && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground border rounded px-3 py-2">
+                <Link2 className="h-3.5 w-3.5" /> Esta receita faz parte de uma série — ao salvar você poderá escolher o escopo.
+              </p>
+            )}
+
             {gross > 0 && (
               <p className="text-xs text-muted-foreground">
                 Imposto ({(taxRate * 100).toFixed(0)}%): {formatCurrency(gross * taxRate)} → Líquido: <span className="font-medium text-foreground">{formatCurrency(gross * (1 - taxRate))}</span>
@@ -329,12 +293,81 @@ export default function Receitas() {
             <div className="flex flex-col gap-2 pt-1 sm:flex-row">
               <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={closeDialog}>Cancelar</Button>
               <Button type="submit" className="w-full sm:flex-1" disabled={isPending}>
-                {isPending
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</>
-                  : editingId !== null ? "Salvar alterações" : "Adicionar Receita"}
+                {isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</> : editingItem ? "Salvar alterações" : "Adicionar Receita"}
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ────── Dialog: escopo de edição de série ────── */}
+      <Dialog open={!!seriesEditDialog} onOpenChange={v => !v && setSeriesEditDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar receita da série</DialogTitle>
+            <DialogDescription>Esta receita faz parte de uma série vinculada. O que deseja alterar?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full"
+              onClick={() => { if (seriesEditDialog) { updateMutation.mutate(seriesEditDialog.payload); setSeriesEditDialog(null); } }}
+              disabled={updateMutation.isPending}
+            >
+              Somente esta receita
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                if (!seriesEditDialog) return;
+                const { payload, seriesId } = seriesEditDialog;
+                updateSeriesMut.mutate({
+                  seriesId,
+                  description: payload.description,
+                  category: payload.category,
+                  grossAmount: payload.grossAmount,
+                  taxAmount: payload.taxAmount,
+                  netAmount: payload.netAmount,
+                  client: payload.client,
+                });
+                // Também atualiza este item individualmente (status/data)
+                updateMutation.mutate(payload);
+              }}
+              disabled={updateSeriesMut.isPending}
+            >
+              Toda a série (todos os meses)
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => setSeriesEditDialog(null)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ────── Dialog: escopo de exclusão de série ────── */}
+      <Dialog open={!!deleteDialog} onOpenChange={v => !v && setDeleteDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Apagar receita da série</DialogTitle>
+            <DialogDescription>Esta receita faz parte de uma série vinculada. O que deseja apagar?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={() => { if (deleteDialog) deleteMutation.mutate({ id: deleteDialog.id }); }}
+              disabled={deleteMutation.isPending}
+            >
+              Somente esta receita
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-destructive text-destructive hover:bg-destructive/10"
+              onClick={() => { if (deleteDialog?.seriesId) deleteSeriesMut.mutate({ seriesId: deleteDialog.seriesId }); }}
+              disabled={deleteSeriesMut.isPending}
+            >
+              Apagar toda a série
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => setDeleteDialog(null)}>Cancelar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -359,7 +392,7 @@ export default function Receitas() {
                 <TableHead className="text-right">Líquido</TableHead>
                 <TableHead>Vencimento</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[90px]"></TableHead>
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -369,22 +402,23 @@ export default function Receitas() {
                 <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhuma receita neste mês</TableCell></TableRow>
               ) : items.map(item => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.description}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {item.seriesId && <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                      {item.description}
+                    </span>
+                  </TableCell>
                   <TableCell>{item.category}</TableCell>
                   <TableCell>{item.client || "-"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(item.grossAmount)}</TableCell>
                   <TableCell className="text-right text-destructive">{formatCurrency(item.taxAmount)}</TableCell>
                   <TableCell className="text-right text-primary font-medium">{formatCurrency(item.netAmount)}</TableCell>
                   <TableCell>{formatDate(item.dueDate)}</TableCell>
-                  <TableCell>
-                    <button onClick={() => toggleStatus(item)}>
-                      <StatusBadge status={item.status} />
-                    </button>
-                  </TableCell>
+                  <TableCell><button onClick={() => toggleStatus(item)}><StatusBadge status={item.status} /></button></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate({ id: item.id })}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(item)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>

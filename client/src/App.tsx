@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -6,48 +7,60 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 
-// Pages
-import DashboardEmpresa from "./pages/DashboardEmpresa";
-import DashboardPessoal from "./pages/DashboardPessoal";
-import Receitas from "./pages/Receitas";
-import CustosFixos from "./pages/CustosFixos";
-import CustosVariaveis from "./pages/CustosVariaveis";
-import Funcionarios from "./pages/Funcionarios";
-import Fornecedores from "./pages/Fornecedores";
-import Clientes from "./pages/Clientes";
-import Servicos from "./pages/Servicos";
-import ContasFixas from "./pages/ContasFixas";
-import ContasVariaveis from "./pages/ContasVariaveis";
-import Dividas from "./pages/Dividas";
-import Investimentos from "./pages/Investimentos";
-import FundoReserva from "./pages/FundoReserva";
-import DRE from "./pages/DRE";
-import Calendario from "./pages/Calendario";
-import Configuracoes from "./pages/Configuracoes";
+const DashboardEmpresa = lazy(() => import("./pages/DashboardEmpresa"));
+const DashboardPessoal = lazy(() => import("./pages/DashboardPessoal"));
+const Receitas = lazy(() => import("./pages/Receitas"));
+const CustosFixos = lazy(() => import("./pages/CustosFixos"));
+const CustosVariaveis = lazy(() => import("./pages/CustosVariaveis"));
+const Funcionarios = lazy(() => import("./pages/Funcionarios"));
+const Fornecedores = lazy(() => import("./pages/Fornecedores"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const Servicos = lazy(() => import("./pages/Servicos"));
+const ContasFixas = lazy(() => import("./pages/ContasFixas"));
+const ContasVariaveis = lazy(() => import("./pages/ContasVariaveis"));
+const Dividas = lazy(() => import("./pages/Dividas"));
+const Investimentos = lazy(() => import("./pages/Investimentos"));
+const FundoReserva = lazy(() => import("./pages/FundoReserva"));
+const DRE = lazy(() => import("./pages/DRE"));
+const Calendario = lazy(() => import("./pages/Calendario"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center rounded-[28px] border border-zinc-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center gap-3 text-sm font-medium text-zinc-500">
+        <span className="size-2.5 animate-pulse rounded-full bg-orange-500" />
+        Carregando tela...
+      </div>
+    </div>
+  );
+}
 
 function Router() {
   return (
     <DashboardLayout>
-      <Switch>
-        <Route path="/" component={DashboardEmpresa} />
-        <Route path="/pessoal" component={DashboardPessoal} />
-        <Route path="/receitas" component={Receitas} />
-        <Route path="/custos-fixos" component={CustosFixos} />
-        <Route path="/custos-variaveis" component={CustosVariaveis} />
-        <Route path="/funcionarios" component={Funcionarios} />
-        <Route path="/fornecedores" component={Fornecedores} />
-        <Route path="/clientes" component={Clientes} />
-        <Route path="/servicos" component={Servicos} />
-        <Route path="/contas-fixas" component={ContasFixas} />
-        <Route path="/contas-variaveis" component={ContasVariaveis} />
-        <Route path="/dividas" component={Dividas} />
-        <Route path="/investimentos" component={Investimentos} />
-        <Route path="/fundo-reserva" component={FundoReserva} />
-        <Route path="/dre" component={DRE} />
-        <Route path="/calendario" component={Calendario} />
-        <Route path="/configuracoes" component={Configuracoes} />
-        <Route component={NotFound} />
-      </Switch>
+      <Suspense fallback={<RouteFallback />}>
+        <Switch>
+          <Route path="/" component={DashboardEmpresa} />
+          <Route path="/pessoal" component={DashboardPessoal} />
+          <Route path="/receitas" component={Receitas} />
+          <Route path="/custos-fixos" component={CustosFixos} />
+          <Route path="/custos-variaveis" component={CustosVariaveis} />
+          <Route path="/funcionarios" component={Funcionarios} />
+          <Route path="/fornecedores" component={Fornecedores} />
+          <Route path="/clientes" component={Clientes} />
+          <Route path="/servicos" component={Servicos} />
+          <Route path="/contas-fixas" component={ContasFixas} />
+          <Route path="/contas-variaveis" component={ContasVariaveis} />
+          <Route path="/dividas" component={Dividas} />
+          <Route path="/investimentos" component={Investimentos} />
+          <Route path="/fundo-reserva" component={FundoReserva} />
+          <Route path="/dre" component={DRE} />
+          <Route path="/calendario" component={Calendario} />
+          <Route path="/configuracoes" component={Configuracoes} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
     </DashboardLayout>
   );
 }

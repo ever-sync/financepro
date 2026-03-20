@@ -48,6 +48,7 @@ export const appRouter = router({
         dueDate: z.string(),
         receivedDate: z.string().nullable().optional(),
         status: z.enum(["pendente", "recebido", "atrasado"]).optional(),
+        seriesId: z.string().optional(),
         notes: z.string().optional(),
       }))
       .mutation(({ ctx, input }) => db.createRevenue({ userId: ctx.user.id, ...input })),
@@ -72,6 +73,23 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ ctx, input }) => db.deleteRevenue(input.id, ctx.user.id)),
+    deleteSeries: protectedProcedure
+      .input(z.object({ seriesId: z.string() }))
+      .mutation(({ ctx, input }) => db.deleteRevenueSeries(input.seriesId, ctx.user.id)),
+    updateSeries: protectedProcedure
+      .input(z.object({
+        seriesId: z.string(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        grossAmount: z.string().optional(),
+        taxAmount: z.string().optional(),
+        netAmount: z.string().optional(),
+        client: z.string().nullable().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        const { seriesId, ...data } = input;
+        return db.updateRevenueSeries(seriesId, ctx.user.id, data);
+      }),
   }),
 
   // ==================== COMPANY FIXED COSTS ====================
@@ -483,6 +501,7 @@ export const appRouter = router({
         category: z.string().optional(),
         basePrice: z.string(),
         unit: z.string().optional(),
+        recurrence: z.string().optional(),
         status: z.string().optional(),
         notes: z.string().optional(),
       }))
@@ -495,12 +514,16 @@ export const appRouter = router({
         category: z.string().nullable().optional(),
         basePrice: z.string().optional(),
         unit: z.string().optional(),
+        recurrence: z.string().nullable().optional(),
         status: z.string().optional(),
         notes: z.string().nullable().optional(),
       }))
       .mutation(({ ctx, input }) => {
-        const { id, ...data } = input;
-        return db.updateService(id, ctx.user.id, data);
+        const { id, recurrence, ...data } = input;
+        return db.updateService(id, ctx.user.id, {
+          ...data,
+          ...(recurrence != null ? { recurrence } : {}),
+        });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))

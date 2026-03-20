@@ -78,14 +78,14 @@ export default function Fornecedores() {
               <DialogContent>
                 <DialogHeader><DialogTitle>Nova Compra</DialogTitle></DialogHeader>
                 <form onSubmit={handlePurchaseSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2"><Label>Fornecedor</Label>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="md:col-span-2"><Label>Fornecedor</Label>
                       <Select name="supplierId" required>
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>{suppliers.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2"><Label>Descrição</Label><Input name="description" required /></div>
+                    <div className="md:col-span-2"><Label>Descrição</Label><Input name="description" required /></div>
                     <div><Label>Valor (R$)</Label><Input name="amount" type="number" step="0.01" required /></div>
                     <div><Label>Vencimento</Label><Input name="dueDate" type="date" required /></div>
                     <div><Label>Forma Pgto</Label><Input name="paymentMethod" placeholder="PIX, Boleto..." /></div>
@@ -150,13 +150,13 @@ export default function Fornecedores() {
               <DialogContent>
                 <DialogHeader><DialogTitle>Novo Fornecedor</DialogTitle></DialogHeader>
                 <form onSubmit={handleSupplierSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2"><Label>Nome</Label><Input name="name" required /></div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="md:col-span-2"><Label>Nome</Label><Input name="name" required /></div>
                     <div><Label>CNPJ</Label><Input name="cnpj" /></div>
                     <div><Label>Categoria</Label><Input name="category" /></div>
                     <div><Label>Contato</Label><Input name="contact" /></div>
                     <div><Label>Telefone</Label><Input name="phone" /></div>
-                    <div className="col-span-2"><Label>Email</Label><Input name="email" type="email" /></div>
+                    <div className="md:col-span-2"><Label>Email</Label><Input name="email" type="email" /></div>
                   </div>
                   <Button type="submit" className="w-full" disabled={createSupplier.isPending}>
                     {createSupplier.isPending ? "Salvando..." : "Adicionar"}
