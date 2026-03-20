@@ -17,15 +17,35 @@ type ContractType = "clt" | "pj";
 export default function Funcionarios() {
   const utils = trpc.useUtils();
   const { data: items = [], isLoading } = trpc.employees.list.useQuery();
-  const createMut = trpc.employees.create.useMutation({ onSuccess: () => { utils.employees.list.invalidate(); toast.success("Funcionário adicionado"); setOpen(false); resetForm(); } });
-  const updateMut = trpc.employees.update.useMutation({ onSuccess: () => { utils.employees.list.invalidate(); toast.success("Atualizado"); } });
-  const deleteMut = trpc.employees.delete.useMutation({ onSuccess: () => { utils.employees.list.invalidate(); toast.success("Removido"); } });
+  const createMut = trpc.employees.create.useMutation({
+    onSuccess: () => {
+      utils.employees.list.invalidate();
+      toast.success("Funcionario adicionado");
+      setOpen(false);
+      resetForm();
+    },
+  });
+  const updateMut = trpc.employees.update.useMutation({
+    onSuccess: () => {
+      utils.employees.list.invalidate();
+      toast.success("Atualizado");
+    },
+  });
+  const deleteMut = trpc.employees.delete.useMutation({
+    onSuccess: () => {
+      utils.employees.list.invalidate();
+      toast.success("Removido");
+    },
+  });
 
   const [open, setOpen] = useState(false);
   const [salary, setSalary] = useState("");
   const [contractType, setContractType] = useState<ContractType>("clt");
 
-  const resetForm = () => { setSalary(""); setContractType("clt"); };
+  const resetForm = () => {
+    setSalary("");
+    setContractType("clt");
+  };
 
   const salaryNum = parseFloat(salary) || 0;
   const isCLT = contractType === "clt";
@@ -47,6 +67,7 @@ export default function Funcionarios() {
       thirteenthProvision: thirteenth.toFixed(2),
       vacationProvision: vacation.toFixed(2),
       totalCost: totalCost.toFixed(2),
+      paymentDay: parseInt(fd.get("paymentDay") as string) || 5,
       admissionDate: (fd.get("admissionDate") as string) || undefined,
     });
   };
@@ -62,32 +83,44 @@ export default function Funcionarios() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Funcionários</h1>
-          <p className="text-sm text-muted-foreground">Folha de pagamento com cálculos automáticos de encargos</p>
+          <h1 className="text-2xl font-bold tracking-tight">Funcionarios</h1>
+          <p className="text-sm text-muted-foreground">Folha de pagamento com calculos automaticos de encargos</p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-          <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Funcionário</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button size="sm">
+              <Plus className="mr-1 h-4 w-4" /> Novo Funcionario
+            </Button>
+          </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo Funcionário</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Novo Funcionario</DialogTitle>
+            </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-
-              {/* Tipo de contrato */}
               <div>
                 <Label>Tipo de Contrato</Label>
-                <div className="flex gap-2 mt-1">
+                <div className="mt-1 flex gap-2">
                   <button
                     type="button"
                     onClick={() => setContractType("clt")}
-                    className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${contractType === "clt" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                    className={`flex-1 rounded-md border py-2 text-sm font-medium transition-colors ${
+                      contractType === "clt"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
                   >
                     CLT
                   </button>
                   <button
                     type="button"
                     onClick={() => setContractType("pj")}
-                    className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${contractType === "pj" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                    className={`flex-1 rounded-md border py-2 text-sm font-medium transition-colors ${
+                      contractType === "pj"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
                   >
                     PJ / CNPJ
                   </button>
@@ -95,32 +128,58 @@ export default function Funcionarios() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2"><Label>Nome</Label><Input name="name" required /></div>
-                <div><Label>Cargo</Label><Input name="role" required /></div>
-                <div>
-                  <Label>{isCLT ? "Salário (R$)" : "Valor do Contrato (R$)"}</Label>
-                  <Input name="salary" type="number" step="0.01" required value={salary} onChange={e => setSalary(e.target.value)} />
+                <div className="col-span-2">
+                  <Label>Nome</Label>
+                  <Input name="name" required />
                 </div>
-                <div><Label>Data Admissão</Label><Input name="admissionDate" type="date" /></div>
+                <div>
+                  <Label>Cargo</Label>
+                  <Input name="role" required />
+                </div>
+                <div>
+                  <Label>{isCLT ? "Salario (R$)" : "Valor do Contrato (R$)"}</Label>
+                  <Input
+                    name="salary"
+                    type="number"
+                    step="0.01"
+                    required
+                    value={salary}
+                    onChange={e => setSalary(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Dia do Pagamento</Label>
+                  <Input name="paymentDay" type="number" min="1" max="31" defaultValue={5} required />
+                </div>
+                <div>
+                  <Label>Data Admissao</Label>
+                  <Input name="admissionDate" type="date" />
+                </div>
               </div>
 
               {salaryNum > 0 && (
                 <Card className="bg-muted/50">
-                  <CardContent className="pt-4 pb-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">
-                      {isCLT ? "Cálculo Automático (CLT)" : "Resumo PJ"}
+                  <CardContent className="pb-4 pt-4">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
+                      {isCLT ? "Calculo Automatico (CLT)" : "Resumo PJ"}
                     </p>
                     {isCLT ? (
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <span className="text-muted-foreground">FGTS (8%):</span><span className="text-right">{formatCurrency(fgts)}</span>
-                        <span className="text-muted-foreground">Provisão 13º:</span><span className="text-right">{formatCurrency(thirteenth)}</span>
-                        <span className="text-muted-foreground">Provisão Férias:</span><span className="text-right">{formatCurrency(vacation)}</span>
-                        <span className="font-medium border-t pt-1">Custo Total:</span><span className="text-right font-bold text-primary border-t pt-1">{formatCurrency(totalCost)}</span>
+                        <span className="text-muted-foreground">FGTS (8%):</span>
+                        <span className="text-right">{formatCurrency(fgts)}</span>
+                        <span className="text-muted-foreground">Provision 13o:</span>
+                        <span className="text-right">{formatCurrency(thirteenth)}</span>
+                        <span className="text-muted-foreground">Provision Ferias:</span>
+                        <span className="text-right">{formatCurrency(vacation)}</span>
+                        <span className="border-t pt-1 font-medium">Custo Total:</span>
+                        <span className="border-t pt-1 text-right font-bold text-primary">{formatCurrency(totalCost)}</span>
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <span className="text-muted-foreground">Sem FGTS / encargos</span><span className="text-right text-muted-foreground">—</span>
-                        <span className="font-medium border-t pt-1">Valor do Contrato:</span><span className="text-right font-bold text-primary border-t pt-1">{formatCurrency(salaryNum)}</span>
+                        <span className="text-muted-foreground">Sem FGTS / encargos</span>
+                        <span className="text-right text-muted-foreground">-</span>
+                        <span className="border-t pt-1 font-medium">Valor do Contrato:</span>
+                        <span className="border-t pt-1 text-right font-bold text-primary">{formatCurrency(salaryNum)}</span>
                       </div>
                     )}
                   </CardContent>
@@ -135,13 +194,30 @@ export default function Funcionarios() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card><CardContent className="pt-6 flex items-center justify-between">
-          <div><p className="text-xs text-muted-foreground uppercase">Funcionários Ativos</p><p className="text-xl font-bold mt-1">{activeEmployees.length}</p></div>
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center"><Users className="h-5 w-5 text-primary" /></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground uppercase">Total Salários / Contratos</p><p className="text-xl font-bold mt-1">{formatCurrency(totalSalaries)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground uppercase">Custo Total Folha</p><p className="text-xl font-bold mt-1 text-destructive">{formatCurrency(totalPayroll)}</p></CardContent></Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center justify-between pt-6">
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Funcionarios Ativos</p>
+              <p className="mt-1 text-xl font-bold">{activeEmployees.length}</p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs uppercase text-muted-foreground">Total Salarios / Contratos</p>
+            <p className="mt-1 text-xl font-bold">{formatCurrency(totalSalaries)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs uppercase text-muted-foreground">Custo Total Folha</p>
+            <p className="mt-1 text-xl font-bold text-destructive">{formatCurrency(totalPayroll)}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -152,10 +228,11 @@ export default function Funcionarios() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Cargo</TableHead>
                 <TableHead>Contrato</TableHead>
-                <TableHead className="text-right">Salário / Contrato</TableHead>
+                <TableHead>Pagamento</TableHead>
+                <TableHead className="text-right">Salario / Contrato</TableHead>
                 <TableHead className="text-right">FGTS</TableHead>
-                <TableHead className="text-right">13º Prov.</TableHead>
-                <TableHead className="text-right">Férias Prov.</TableHead>
+                <TableHead className="text-right">13o Prov.</TableHead>
+                <TableHead className="text-right">Ferias Prov.</TableHead>
                 <TableHead className="text-right">Custo Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-15"></TableHead>
@@ -163,27 +240,59 @@ export default function Funcionarios() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : items.length === 0 ? (
-                <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum funcionário cadastrado</TableCell></TableRow>
-              ) : items.map(item => (
-                <TableRow key={item.id} className={item.status === "inativo" ? "opacity-50" : ""}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>{item.role}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.contractType === "pj" ? "outline" : "secondary"} className="text-xs">
-                      {item.contractType === "pj" ? "PJ" : "CLT"}
-                    </Badge>
+                <TableRow>
+                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                    Carregando...
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.salary)}</TableCell>
-                  <TableCell className="text-right">{item.contractType === "pj" ? <span className="text-muted-foreground">—</span> : formatCurrency(item.fgtsAmount)}</TableCell>
-                  <TableCell className="text-right">{item.contractType === "pj" ? <span className="text-muted-foreground">—</span> : formatCurrency(item.thirteenthProvision)}</TableCell>
-                  <TableCell className="text-right">{item.contractType === "pj" ? <span className="text-muted-foreground">—</span> : formatCurrency(item.vacationProvision)}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(item.totalCost)}</TableCell>
-                  <TableCell><button onClick={() => toggleStatus(item)}><StatusBadge status={item.status} /></button></TableCell>
-                  <TableCell><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label="Remover funcionário" onClick={() => deleteMut.mutate({ id: item.id })}><Trash2 className="h-4 w-4" /></Button></TableCell>
                 </TableRow>
-              ))}
+              ) : items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                    Nenhum funcionario cadastrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                items.map(item => (
+                  <TableRow key={item.id} className={item.status === "inativo" ? "opacity-50" : ""}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell>{item.role}</TableCell>
+                    <TableCell>
+                      <Badge variant={item.contractType === "pj" ? "outline" : "secondary"} className="text-xs">
+                        {item.contractType === "pj" ? "PJ" : "CLT"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>Dia {item.paymentDay || 5}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(item.salary)}</TableCell>
+                    <TableCell className="text-right">
+                      {item.contractType === "pj" ? <span className="text-muted-foreground">-</span> : formatCurrency(item.fgtsAmount)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.contractType === "pj" ? <span className="text-muted-foreground">-</span> : formatCurrency(item.thirteenthProvision)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.contractType === "pj" ? <span className="text-muted-foreground">-</span> : formatCurrency(item.vacationProvision)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(item.totalCost)}</TableCell>
+                    <TableCell>
+                      <button onClick={() => toggleStatus(item)}>
+                        <StatusBadge status={item.status} />
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        aria-label="Remover funcionario"
+                        onClick={() => deleteMut.mutate({ id: item.id })}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

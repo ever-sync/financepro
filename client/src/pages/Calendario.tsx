@@ -12,7 +12,7 @@ interface PaymentItem {
   amount: string;
   dueDay: number;
   status: string;
-  type: "empresa-fixo" | "empresa-variavel" | "pessoal-fixo" | "pessoal-variavel" | "divida" | "fornecedor";
+  type: "empresa-fixo" | "empresa-variavel" | "empresa-folha" | "pessoal-fixo" | "pessoal-variavel" | "divida" | "fornecedor";
 }
 
 export default function Calendario() {
@@ -21,6 +21,7 @@ export default function Calendario() {
   const { data: companyVariable = [] } = trpc.companyVariableCosts.list.useQuery({ month, year });
   const { data: personalFixed = [] } = trpc.personalFixedCosts.list.useQuery({ month, year });
   const { data: personalVariable = [] } = trpc.personalVariableCosts.list.useQuery({ month, year });
+  const { data: employees = [] } = trpc.employees.list.useQuery();
   const { data: debts = [] } = trpc.debts.list.useQuery();
 
   const today = new Date().getDate();
@@ -62,6 +63,16 @@ export default function Calendario() {
       status: item.status,
       type: "pessoal-variavel" as const,
     })),
+    ...employees
+      .filter(item => item.status === "ativo")
+      .map(item => ({
+        id: `em-${item.id}`,
+        description: `[EMP] Salário - ${item.name}`,
+        amount: item.totalCost,
+        dueDay: item.paymentDay || 5,
+        status: isCurrentMonth && (item.paymentDay || 5) < today ? "atrasada" : "pendente",
+        type: "empresa-folha" as const,
+      })),
     ...debts
       .filter(item => item.status !== "quitada")
       .map(item => ({
@@ -96,6 +107,8 @@ export default function Calendario() {
       case "empresa-fixo":
       case "empresa-variavel":
         return "bg-primary/10 text-primary";
+      case "empresa-folha":
+        return "bg-blue-50 text-blue-600";
       case "pessoal-fixo":
       case "pessoal-variavel":
         return "bg-chart-2/10 text-chart-2";
@@ -158,6 +171,9 @@ export default function Calendario() {
       <div className="flex flex-wrap gap-3 text-xs">
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-primary/30" /> Empresa
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded bg-blue-300" /> Folha
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-chart-2/30" /> Pessoal

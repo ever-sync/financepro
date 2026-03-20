@@ -162,11 +162,12 @@ export const appRouter = router({
         thirteenthProvision: z.string(),
         vacationProvision: z.string(),
         totalCost: z.string(),
+        paymentDay: z.number().min(1).max(31).optional(),
         admissionDate: z.string().nullable().optional(),
         status: z.enum(["ativo", "inativo"]).optional(),
         notes: z.string().optional(),
       }))
-      .mutation(({ ctx, input }) => db.createEmployee({ userId: ctx.user.id, ...input })),
+      .mutation(({ ctx, input }) => db.createEmployee({ userId: ctx.user.id, ...input, paymentDay: input.paymentDay ?? 5 })),
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -178,6 +179,7 @@ export const appRouter = router({
         thirteenthProvision: z.string().optional(),
         vacationProvision: z.string().optional(),
         totalCost: z.string().optional(),
+        paymentDay: z.number().min(1).max(31).optional(),
         admissionDate: z.string().nullable().optional(),
         status: z.enum(["ativo", "inativo"]).optional(),
         notes: z.string().nullable().optional(),

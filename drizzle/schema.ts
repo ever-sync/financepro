@@ -118,6 +118,7 @@ export const employees = pgTable("employees", {
   thirteenthProvision: numeric("thirteenthProvision", { precision: 12, scale: 2 }).notNull(),
   vacationProvision: numeric("vacationProvision", { precision: 12, scale: 2 }).notNull(),
   totalCost: numeric("totalCost", { precision: 12, scale: 2 }).notNull(),
+  paymentDay: integer("paymentDay").default(5).notNull(),
   admissionDate: varchar("admissionDate", { length: 10 }),
   status: employeeStatusEnum("empStatus").default("ativo").notNull(),
   notes: text("notes"),

@@ -1,0 +1,1 @@
+ALTER TABLE "employees" ADD COLUMN IF NOT EXISTS "paymentDay" integer DEFAULT 5 NOT NULL;

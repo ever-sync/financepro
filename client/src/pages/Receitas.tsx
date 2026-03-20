@@ -27,6 +27,22 @@ interface FormState {
 
 const EMPTY: FormState = { description: "", category: "", grossAmount: "", client: "", dueDate: "", status: "pendente" };
 
+// Gera array de datas deslocadas por mês conforme recorrência
+function buildRecurrenceDates(startDate: string, recurrence: string): string[] {
+  if (!startDate || recurrence === "unico") return [startDate];
+  const cfg: Record<string, { count: number; step: number }> = {
+    mensal:     { count: 12, step: 1 },
+    trimestral: { count:  4, step: 3 },
+    semestral:  { count:  2, step: 6 },
+  };
+  const { count, step } = cfg[recurrence] ?? { count: 1, step: 1 };
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(startDate + "T12:00:00");
+    d.setMonth(d.getMonth() + i * step);
+    return d.toISOString().split("T")[0];
+  });
+}
+
 export default function Receitas() {
   const { month, year, monthName, goToPrevMonth, goToNextMonth } = useMonthYear();
   const utils = trpc.useUtils();
@@ -35,7 +51,7 @@ export default function Receitas() {
   const { data: clients = [] } = trpc.clients.list.useQuery();
   const { data: services = [] } = trpc.services.list.useQuery();
 
-  const createMutation = trpc.revenues.create.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita adicionada"); closeDialog(); } });
+  const createMutation = trpc.revenues.create.useMutation();
   const updateMutation = trpc.revenues.update.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita atualizada"); closeDialog(); } });
   const deleteMutation = trpc.revenues.delete.useMutation({ onSuccess: () => { utils.revenues.list.invalidate(); toast.success("Receita removida"); } });
 
@@ -43,39 +59,56 @@ export default function Receitas() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [selectedService, setSelectedService] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [recurrence, setRecurrence] = useState("unico");
+  const [submitting, setSubmitting] = useState(false);
 
   const taxRate = parseFloat(settings?.taxPercent || "6") / 100;
 
-  const closeDialog = () => { setOpen(false); setEditingId(null); setForm(EMPTY); setSelectedService(""); };
+  const closeDialog = () => {
+    setOpen(false); setEditingId(null); setForm(EMPTY);
+    setSelectedService(""); setQuantity("1"); setRecurrence("unico");
+  };
 
-  const openCreate = () => { setEditingId(null); setForm(EMPTY); setSelectedService(""); setOpen(true); };
+  const openCreate = () => { setEditingId(null); setForm(EMPTY); setSelectedService(""); setQuantity("1"); setRecurrence("unico"); setOpen(true); };
 
   const openEdit = (item: typeof items[0]) => {
     setEditingId(item.id);
-    setForm({
-      description: item.description,
-      category: item.category,
-      grossAmount: parseFloat(item.grossAmount).toFixed(2),
-      client: item.client ?? "",
-      dueDate: item.dueDate,
-      status: item.status,
-    });
-    setSelectedService("");
+    setForm({ description: item.description, category: item.category, grossAmount: parseFloat(item.grossAmount).toFixed(2), client: item.client ?? "", dueDate: item.dueDate, status: item.status });
+    setSelectedService(""); setQuantity("1"); setRecurrence("unico");
     setOpen(true);
   };
 
   const set = (field: keyof FormState, val: string) => setForm(prev => ({ ...prev, [field]: val }));
 
+  // Serviço selecionado (para saber a unidade)
+  const selectedSvc = services.find(s => String(s.id) === selectedService);
+  const isHourly = selectedSvc?.unit === "hora";
+
   const handleServiceChange = (val: string) => {
     setSelectedService(val);
+    setQuantity("1");
     if (val === "__none__") { setSelectedService(""); return; }
     const svc = services.find(s => String(s.id) === val);
     if (svc) {
-      setForm(prev => ({ ...prev, description: svc.name, grossAmount: parseFloat(svc.basePrice).toFixed(2) }));
+      setForm(prev => ({
+        ...prev,
+        description: svc.name,
+        grossAmount: parseFloat(svc.basePrice).toFixed(2),
+        category: prev.category || "Serviço",
+      }));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleQuantityChange = (val: string) => {
+    setQuantity(val);
+    if (selectedSvc && val) {
+      const total = parseFloat(selectedSvc.basePrice) * (parseFloat(val) || 0);
+      setForm(prev => ({ ...prev, grossAmount: total.toFixed(2) }));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const gross = parseFloat(form.grossAmount) || 0;
     const tax = gross * taxRate;
@@ -94,17 +127,32 @@ export default function Receitas() {
         dueDate: form.dueDate,
         status: form.status as any,
       });
-    } else {
-      createMutation.mutate({
-        description: form.description,
-        category: form.category,
-        grossAmount: gross.toFixed(2),
-        taxAmount: tax.toFixed(2),
-        netAmount: net.toFixed(2),
-        client,
-        dueDate: form.dueDate,
-        status: "pendente",
-      });
+      return;
+    }
+
+    // Criação com recorrência
+    const dates = buildRecurrenceDates(form.dueDate, recurrence);
+    setSubmitting(true);
+    try {
+      await Promise.all(dates.map(dueDate =>
+        createMutation.mutateAsync({
+          description: form.description,
+          category: form.category,
+          grossAmount: gross.toFixed(2),
+          taxAmount: tax.toFixed(2),
+          netAmount: net.toFixed(2),
+          client,
+          dueDate,
+          status: "pendente",
+        })
+      ));
+      utils.revenues.list.invalidate();
+      toast.success(dates.length > 1 ? `${dates.length} receitas criadas` : "Receita adicionada");
+      closeDialog();
+    } catch {
+      toast.error("Erro ao salvar");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -117,7 +165,8 @@ export default function Receitas() {
     });
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = submitting || updateMutation.isPending;
+  const gross = parseFloat(form.grossAmount) || 0;
   const totalGross = items.reduce((s, i) => s + parseFloat(i.grossAmount), 0);
   const totalNet = items.reduce((s, i) => s + parseFloat(i.netAmount), 0);
   const totalReceived = items.filter(i => i.status === "recebido").reduce((s, i) => s + parseFloat(i.grossAmount), 0);
@@ -143,7 +192,8 @@ export default function Receitas() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-            {/* Serviço (apenas no cadastro) */}
+
+            {/* Serviço — só no cadastro */}
             {editingId === null && (
               <div className="space-y-1">
                 <Label>Serviço</Label>
@@ -158,6 +208,26 @@ export default function Receitas() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {/* Quantidade de horas — só quando serviço é por hora */}
+            {editingId === null && isHourly && (
+              <div className="space-y-1">
+                <Label>Horas neste mês</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={quantity}
+                    onChange={e => handleQuantityChange(e.target.value)}
+                    className="w-32"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    × {formatCurrency(selectedSvc!.basePrice)}/h = <span className="font-medium text-foreground">{formatCurrency(gross)}</span>
+                  </span>
+                </div>
               </div>
             )}
 
@@ -177,10 +247,16 @@ export default function Receitas() {
                 </Select>
               </div>
 
-              {/* Valor Bruto */}
+              {/* Valor Bruto — desabilitado se horário (calculado pela qtde) */}
               <div className="space-y-1">
                 <Label>Valor Bruto (R$)</Label>
-                <Input type="number" step="0.01" value={form.grossAmount} onChange={e => set("grossAmount", e.target.value)} required />
+                <Input
+                  type="number" step="0.01"
+                  value={form.grossAmount}
+                  onChange={e => set("grossAmount", e.target.value)}
+                  disabled={isHourly && editingId === null}
+                  required
+                />
               </div>
 
               {/* Cliente */}
@@ -217,18 +293,42 @@ export default function Receitas() {
               )}
             </div>
 
-            {/* Imposto calculado (exibição) */}
-            {form.grossAmount && (
+            {/* Recorrência — só no cadastro */}
+            {editingId === null && (
+              <div className="space-y-1 border-t pt-4">
+                <Label>Recorrência</Label>
+                <Select value={recurrence} onValueChange={setRecurrence}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unico">Somente este mês</SelectItem>
+                    <SelectItem value="mensal">Mensal (12 meses)</SelectItem>
+                    <SelectItem value="trimestral">Trimestral (a cada 3 meses)</SelectItem>
+                    <SelectItem value="semestral">Semestral (a cada 6 meses)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {recurrence !== "unico" && (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    {recurrence === "mensal" && "Serão criadas 12 receitas, uma por mês."}
+                    {recurrence === "trimestral" && "Serão criadas 4 receitas: mês atual + 3, +6, +9 meses."}
+                    {recurrence === "semestral" && "Serão criadas 2 receitas: mês atual + 6 meses."}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Preview imposto */}
+            {gross > 0 && (
               <p className="text-xs text-muted-foreground">
-                Imposto ({(taxRate * 100).toFixed(0)}%): {formatCurrency((parseFloat(form.grossAmount) || 0) * taxRate)} →
-                Líquido: <span className="font-medium text-foreground">{formatCurrency((parseFloat(form.grossAmount) || 0) * (1 - taxRate))}</span>
+                Imposto ({(taxRate * 100).toFixed(0)}%): {formatCurrency(gross * taxRate)} → Líquido: <span className="font-medium text-foreground">{formatCurrency(gross * (1 - taxRate))}</span>
               </p>
             )}
 
             <div className="flex gap-2 pt-1">
               <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>Cancelar</Button>
               <Button type="submit" className="flex-1" disabled={isPending}>
-                {isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</> : editingId !== null ? "Salvar alterações" : "Adicionar Receita"}
+                {isPending
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</>
+                  : editingId !== null ? "Salvar alterações" : "Adicionar Receita"}
               </Button>
             </div>
           </form>

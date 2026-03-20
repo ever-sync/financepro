@@ -699,6 +699,17 @@ export async function getCalendarData(userId: number, month: number, year: numbe
     status: c.status,
   }));
 
+  const employees = await getEmployees(userId);
+  employees.filter(e => e.status === "ativo").forEach(e =>
+    items.push({
+      day: e.paymentDay ?? 5,
+      description: `[EMP] Salário - ${e.name}`,
+      amount: e.totalCost,
+      type: "empresa-folha",
+      status: isCurrentMonth && (e.paymentDay ?? 5) < today ? "atrasada" : "pendente",
+    })
+  );
+
   const activeDebts = await getDebts(userId);
   activeDebts.filter(d => d.status !== "quitada").forEach(d =>
     items.push({

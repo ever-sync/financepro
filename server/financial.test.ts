@@ -47,6 +47,7 @@ vi.mock("./db", () => {
     thirteenthProvision: "250.00",
     vacationProvision: "333.33",
     totalCost: "3823.33",
+    paymentDay: 5,
     admissionDate: "2025-01-15",
     status: "ativo",
     createdAt: new Date(),
@@ -115,6 +116,7 @@ vi.mock("./db", () => {
     getReserveFunds: vi.fn().mockResolvedValue([]),
     createReserveFund: vi.fn().mockResolvedValue({ id: 1 }),
     deleteReserveFund: vi.fn().mockResolvedValue(undefined),
+    getCalendarData: vi.fn().mockResolvedValue([]),
     getCompanyDashboardData: vi.fn().mockResolvedValue({
       revenue: { items: [], totalGross: "10000.00", totalTax: "600.00", totalNet: "9400.00" },
       fixedCosts: { items: [], total: "3000.00" },
@@ -242,8 +244,13 @@ describe("Employees Router", () => {
       thirteenthProvision: "333.33",
       vacationProvision: "444.44",
       totalCost: "5097.77",
+      paymentDay: 7,
     });
     expect(result).toBeDefined();
+    expect(db.createEmployee).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 1,
+      paymentDay: 7,
+    }));
   });
 });
 

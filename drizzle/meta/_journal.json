@@ -36,6 +36,13 @@
       "when": 1773964800000,
       "tag": "0004_variable_cost_installments",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773966000000,
+      "tag": "0005_employee_payment_day",
+      "breakpoints": true
     }
   ]
 }
