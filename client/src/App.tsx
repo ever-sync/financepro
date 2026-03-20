@@ -14,6 +14,8 @@ import CustosFixos from "./pages/CustosFixos";
 import CustosVariaveis from "./pages/CustosVariaveis";
 import Funcionarios from "./pages/Funcionarios";
 import Fornecedores from "./pages/Fornecedores";
+import Clientes from "./pages/Clientes";
+import Servicos from "./pages/Servicos";
 import ContasFixas from "./pages/ContasFixas";
 import ContasVariaveis from "./pages/ContasVariaveis";
 import Dividas from "./pages/Dividas";
@@ -34,6 +36,8 @@ function Router() {
         <Route path="/custos-variaveis" component={CustosVariaveis} />
         <Route path="/funcionarios" component={Funcionarios} />
         <Route path="/fornecedores" component={Fornecedores} />
+        <Route path="/clientes" component={Clientes} />
+        <Route path="/servicos" component={Servicos} />
         <Route path="/contas-fixas" component={ContasFixas} />
         <Route path="/contas-variaveis" component={ContasVariaveis} />
         <Route path="/dividas" component={Dividas} />
@@ -51,7 +55,7 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />

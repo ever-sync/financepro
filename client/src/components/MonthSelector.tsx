@@ -10,15 +10,15 @@ interface MonthSelectorProps {
 
 export function MonthSelector({ monthName, year, onPrev, onNext }: MonthSelectorProps) {
   return (
-    <div className="flex items-center gap-2">
-      <Button variant="outline" size="icon" onClick={onPrev} className="h-8 w-8">
-        <ChevronLeft className="h-4 w-4" />
+    <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+      <Button variant="ghost" size="icon-sm" onClick={onPrev} className="size-8 rounded-full text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900">
+        <ChevronLeft className="size-4" />
       </Button>
-      <span className="text-sm font-medium min-w-[140px] text-center">
+      <span className="min-w-[140px] px-2 text-center text-sm font-medium text-zinc-700">
         {monthName} {year}
       </span>
-      <Button variant="outline" size="icon" onClick={onNext} className="h-8 w-8">
-        <ChevronRight className="h-4 w-4" />
+      <Button variant="ghost" size="icon-sm" onClick={onNext} className="size-8 rounded-full text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900">
+        <ChevronRight className="size-4" />
       </Button>
     </div>
   );

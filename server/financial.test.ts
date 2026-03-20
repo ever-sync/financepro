@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import * as db from "./db";
 
 // Mock the database module
 vi.mock("./db", () => {
@@ -155,6 +156,10 @@ function createAuthContext(): TrpcContext {
   };
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 describe("Settings Router", () => {
   it("returns user settings", async () => {
     const ctx = createAuthContext();
@@ -242,6 +247,46 @@ describe("Employees Router", () => {
   });
 });
 
+describe("Variable Costs Router", () => {
+  it("creates a company variable cost with installments", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.companyVariableCosts.create({
+      description: "Compra parcelada",
+      category: "Material",
+      amount: "1200.00",
+      date: "2026-03-10",
+      installmentCount: 6,
+    });
+
+    expect(db.createCompanyVariableCost).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 1,
+      description: "Compra parcelada",
+      installmentCount: 6,
+    }));
+  });
+
+  it("creates a personal variable cost with installments", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.personalVariableCosts.create({
+      description: "Assinatura anual",
+      category: "Outros",
+      amount: "600.00",
+      date: "2026-03-10",
+      installmentCount: 12,
+    });
+
+    expect(db.createPersonalVariableCost).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 1,
+      description: "Assinatura anual",
+      installmentCount: 12,
+    }));
+  });
+});
+
 describe("Debts Router", () => {
   it("lists all debts", async () => {
     const ctx = createAuthContext();
@@ -265,6 +310,7 @@ describe("Debts Router", () => {
       totalInstallments: 12,
       paidInstallments: 0,
       dueDay: 10,
+      status: "atrasada",
       priority: "media",
     });
     expect(result).toBeDefined();

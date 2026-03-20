@@ -1,26 +1,40 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1773924268394,
-      "tag": "0000_redundant_winter_soldier",
+      "version": "7",
+      "when": 1773937690930,
+      "tag": "0000_large_nebula",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "5",
-      "when": 1773924434433,
-      "tag": "0001_complex_stature",
+      "version": "7",
+      "when": 1773940233853,
+      "tag": "0001_aromatic_rocket_raccoon",
       "breakpoints": true
     },
     {
       "idx": 2,
-      "version": "5",
-      "when": 1773924726237,
-      "tag": "0002_thankful_hercules",
+      "version": "7",
+      "when": 1742342400000,
+      "tag": "0002_clients_services",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773963568691,
+      "tag": "0003_debt_overdue",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773964800000,
+      "tag": "0004_variable_cost_installments",
       "breakpoints": true
     }
   ]

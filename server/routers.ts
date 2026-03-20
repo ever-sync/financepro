@@ -124,6 +124,7 @@ export const appRouter = router({
         amount: z.string(),
         date: z.string(),
         supplier: z.string().optional(),
+        installmentCount: z.number().min(1).max(120).optional(),
         status: z.enum(["pago", "pendente", "atrasado"]).optional(),
         notes: z.string().optional(),
       }))
@@ -155,6 +156,7 @@ export const appRouter = router({
       .input(z.object({
         name: z.string().min(1),
         role: z.string().min(1),
+        contractType: z.enum(["clt", "pj"]).optional(),
         salary: z.string(),
         fgtsAmount: z.string(),
         thirteenthProvision: z.string(),
@@ -170,6 +172,7 @@ export const appRouter = router({
         id: z.number(),
         name: z.string().optional(),
         role: z.string().optional(),
+        contractType: z.enum(["clt", "pj"]).optional(),
         salary: z.string().optional(),
         fgtsAmount: z.string().optional(),
         thirteenthProvision: z.string().optional(),
@@ -309,6 +312,7 @@ export const appRouter = router({
         category: z.string().min(1),
         amount: z.string(),
         date: z.string(),
+        installmentCount: z.number().min(1).max(120).optional(),
         status: z.enum(["pago", "pendente", "atrasado"]).optional(),
         notes: z.string().optional(),
       }))
@@ -346,7 +350,7 @@ export const appRouter = router({
         totalInstallments: z.number(),
         paidInstallments: z.number().optional(),
         dueDay: z.number().min(1).max(31),
-        status: z.enum(["ativa", "quitada", "renegociada"]).optional(),
+        status: z.enum(["ativa", "atrasada", "quitada", "renegociada"]).optional(),
         priority: z.enum(["alta", "media", "baixa"]).optional(),
         notes: z.string().optional(),
       }))
@@ -363,7 +367,7 @@ export const appRouter = router({
         totalInstallments: z.number().optional(),
         paidInstallments: z.number().optional(),
         dueDay: z.number().optional(),
-        status: z.enum(["ativa", "quitada", "renegociada"]).optional(),
+        status: z.enum(["ativa", "atrasada", "quitada", "renegociada"]).optional(),
         priority: z.enum(["alta", "media", "baixa"]).optional(),
         notes: z.string().nullable().optional(),
       }))
@@ -429,6 +433,76 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ ctx, input }) => db.deleteReserveFund(input.id, ctx.user.id)),
+  }),
+
+  // ==================== CLIENTS ====================
+  clients: router({
+    list: protectedProcedure.query(({ ctx }) => db.getClients(ctx.user.id)),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        document: z.string().optional(),
+        category: z.string().optional(),
+        contact: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().optional(),
+        address: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(({ ctx, input }) => db.createClient({ userId: ctx.user.id, ...input })),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        document: z.string().nullable().optional(),
+        category: z.string().nullable().optional(),
+        contact: z.string().nullable().optional(),
+        phone: z.string().nullable().optional(),
+        email: z.string().nullable().optional(),
+        address: z.string().nullable().optional(),
+        notes: z.string().nullable().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        const { id, ...data } = input;
+        return db.updateClient(id, ctx.user.id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ ctx, input }) => db.deleteClient(input.id, ctx.user.id)),
+  }),
+
+  // ==================== SERVICES ====================
+  services: router({
+    list: protectedProcedure.query(({ ctx }) => db.getServices(ctx.user.id)),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        basePrice: z.string(),
+        unit: z.string().optional(),
+        status: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(({ ctx, input }) => db.createService({ userId: ctx.user.id, ...input })),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().nullable().optional(),
+        category: z.string().nullable().optional(),
+        basePrice: z.string().optional(),
+        unit: z.string().optional(),
+        status: z.string().optional(),
+        notes: z.string().nullable().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        const { id, ...data } = input;
+        return db.updateService(id, ctx.user.id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ ctx, input }) => db.deleteService(input.id, ctx.user.id)),
   }),
 
   // ==================== DASHBOARDS ====================
