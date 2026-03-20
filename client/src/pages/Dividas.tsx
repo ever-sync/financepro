@@ -122,7 +122,7 @@ export default function Dividas() {
               <Plus className="mr-1 h-4 w-4" /> Nova Dívida
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Nova Dívida</DialogTitle>
             </DialogHeader>

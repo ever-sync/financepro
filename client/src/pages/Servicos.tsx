@@ -102,7 +102,7 @@ export default function Servicos() {
 
       {/* ── Dialog ── */}
       <Dialog open={open} onOpenChange={v => !v && closeDialog()}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId !== null ? "Editar Serviço" : "Novo Serviço"}</DialogTitle>
           </DialogHeader>
@@ -128,7 +128,7 @@ export default function Servicos() {
             </div>
 
             {/* Categoria + Unidade */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <Label>Categoria</Label>
                 <Input value={form.category} onChange={e => set("category", e.target.value)} placeholder="Ex: Consultoria, TI..." />
@@ -145,7 +145,7 @@ export default function Servicos() {
             </div>
 
             {/* Preço + Status */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <Label>Preço Base (R$) <span className="text-destructive">*</span></Label>
                 <Input
@@ -172,9 +172,9 @@ export default function Servicos() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-1">
-              <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>Cancelar</Button>
-              <Button type="submit" className="flex-1" disabled={isPending}>
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+              <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={closeDialog}>Cancelar</Button>
+              <Button type="submit" className="w-full sm:flex-1" disabled={isPending}>
                 {isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</> : editingId !== null ? "Salvar alterações" : "Cadastrar"}
               </Button>
             </div>

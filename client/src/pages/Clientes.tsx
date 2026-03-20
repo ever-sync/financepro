@@ -172,7 +172,7 @@ export default function Clientes() {
 
       {/* ── Dialog ── */}
       <Dialog open={open} onOpenChange={v => !v && closeDialog()}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId !== null ? "Editar Cliente" : "Cadastrar Cliente"}</DialogTitle>
           </DialogHeader>
@@ -213,7 +213,7 @@ export default function Clientes() {
             </div>
 
             {/* Categoria + Contato */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <Label>Categoria</Label>
                 <Input value={form.category} onChange={e => set("category", e.target.value)} placeholder="Ex: Varejo, Indústria..." />
@@ -225,7 +225,7 @@ export default function Clientes() {
             </div>
 
             {/* Telefone + Email */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <Label>Telefone</Label>
                 <Input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="(00) 00000-0000" />
@@ -250,9 +250,9 @@ export default function Clientes() {
               <Input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Rua, número, bairro, cidade - UF" />
             </div>
 
-            <div className="flex gap-2 pt-1">
-              <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>Cancelar</Button>
-              <Button type="submit" className="flex-1" disabled={isPending || cnpjLoading}>
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+              <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={closeDialog}>Cancelar</Button>
+              <Button type="submit" className="w-full sm:flex-1" disabled={isPending || cnpjLoading}>
                 {isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</> : editingId !== null ? "Salvar alterações" : "Cadastrar"}
               </Button>
             </div>
