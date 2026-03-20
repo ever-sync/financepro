@@ -31,6 +31,7 @@ const EMPTY: FormState = { description: "", category: "", grossAmount: "", clien
 function buildRecurrenceDates(startDate: string, recurrence: string): string[] {
   if (!startDate || recurrence === "unico") return [startDate];
   const cfg: Record<string, { count: number; step: number }> = {
+    pacote3:    { count:  3, step: 1 },
     mensal:     { count: 12, step: 1 },
     trimestral: { count:  4, step: 3 },
     semestral:  { count:  2, step: 6 },
@@ -301,6 +302,7 @@ export default function Receitas() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unico">Somente este mês</SelectItem>
+                    <SelectItem value="pacote3">Pacote 3 meses (mensal)</SelectItem>
                     <SelectItem value="mensal">Mensal (12 meses)</SelectItem>
                     <SelectItem value="trimestral">Trimestral (a cada 3 meses)</SelectItem>
                     <SelectItem value="semestral">Semestral (a cada 6 meses)</SelectItem>
@@ -308,9 +310,10 @@ export default function Receitas() {
                 </Select>
                 {recurrence !== "unico" && (
                   <p className="text-xs text-muted-foreground pt-1">
-                    {recurrence === "mensal" && "Serão criadas 12 receitas, uma por mês."}
+                    {recurrence === "pacote3"    && "Serão criadas 3 receitas: mês atual, +1 e +2 meses."}
+                    {recurrence === "mensal"     && "Serão criadas 12 receitas, uma por mês."}
                     {recurrence === "trimestral" && "Serão criadas 4 receitas: mês atual + 3, +6, +9 meses."}
-                    {recurrence === "semestral" && "Serão criadas 2 receitas: mês atual + 6 meses."}
+                    {recurrence === "semestral"  && "Serão criadas 2 receitas: mês atual + 6 meses."}
                   </p>
                 )}
               </div>
