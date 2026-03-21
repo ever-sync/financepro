@@ -27,8 +27,8 @@ export async function createContext(
     user = null;
   }
 
-  // Dev bypass: auto-login when OAuth is not configured
-  if (!user && process.env.NODE_ENV === "development" && process.env.DEV_AUTO_LOGIN === "true") {
+  // Auto-login when OAuth is not configured (no OAUTH_SERVER_URL / VITE_APP_ID)
+  if (!user && (!process.env.OAUTH_SERVER_URL || !process.env.VITE_APP_ID)) {
     user = await getDevUser();
   }
 

@@ -158,7 +158,10 @@ export default function DashboardLayout({
           <Button
             onClick={() => {
               const loginUrl = getLoginUrl();
-              if (!loginUrl) return;
+              if (!loginUrl) {
+                window.location.reload();
+                return;
+              }
               window.location.href = loginUrl;
             }}
             size="lg"
