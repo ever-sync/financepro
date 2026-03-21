@@ -1,16 +1,51 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { getDb } from "./db";
 import { 
   debts, InsertDebt,
   investments, InsertInvestment,
   reserveFunds, InsertReserveFund,
 } from "../../drizzle/schema";
+import type { PaginationParams, PaginatedResult } from "./utils/pagination";
+import { calculatePagination } from "./utils/pagination";
 
 // ==================== DEBTS ====================
-export async function getDebts(userId: number) {
+export async function getDebts(
+  userId: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof debts.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(debts).where(eq(debts.userId, userId)).orderBy(desc(debts.interestRate));
+  if (!db) {
+    return { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false } };
+  }
+
+  const safePage = Math.max(1, pagination?.page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  // Count total
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(debts)
+    .where(eq(debts.userId, userId));
+
+  // Build order clause
+  const sortBy = pagination?.sortBy && debts[pagination.sortBy as keyof typeof debts] 
+    ? debts[pagination.sortBy as keyof typeof debts] 
+    : debts.interestRate;
+  const orderDir = pagination?.sortOrder === 'desc' ? desc(sortBy) : asc(sortBy);
+
+  const data = await db
+    .select()
+    .from(debts)
+    .where(eq(debts.userId, userId))
+    .orderBy(orderDir)
+    .limit(safeLimit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: calculatePagination(Number(count), safePage, safeLimit)
+  };
 }
 
 export async function createDebt(data: InsertDebt) {
@@ -33,10 +68,43 @@ export async function deleteDebt(id: number, userId: number) {
 }
 
 // ==================== INVESTMENTS ====================
-export async function getInvestments(userId: number) {
+export async function getInvestments(
+  userId: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof investments.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(investments).where(eq(investments.userId, userId)).orderBy(desc(investments.date));
+  if (!db) {
+    return { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false } };
+  }
+
+  const safePage = Math.max(1, pagination?.page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  // Count total
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(investments)
+    .where(eq(investments.userId, userId));
+
+  // Build order clause
+  const sortBy = pagination?.sortBy && investments[pagination.sortBy as keyof typeof investments] 
+    ? investments[pagination.sortBy as keyof typeof investments] 
+    : investments.date;
+  const orderDir = pagination?.sortOrder === 'desc' ? desc(sortBy) : asc(sortBy);
+
+  const data = await db
+    .select()
+    .from(investments)
+    .where(eq(investments.userId, userId))
+    .orderBy(orderDir)
+    .limit(safeLimit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: calculatePagination(Number(count), safePage, safeLimit)
+  };
 }
 
 export async function createInvestment(data: InsertInvestment) {
@@ -59,12 +127,48 @@ export async function deleteInvestment(id: number, userId: number) {
 }
 
 // ==================== RESERVE FUNDS ====================
-export async function getReserveFunds(userId: number, type?: "empresa" | "pessoal") {
+export async function getReserveFunds(
+  userId: number, 
+  type?: "empresa" | "pessoal",
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof reserveFunds.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    return { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false } };
+  }
+
+  const safePage = Math.max(1, pagination?.page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  // Build conditions
   const conditions = [eq(reserveFunds.userId, userId)];
   if (type) conditions.push(eq(reserveFunds.type, type));
-  return db.select().from(reserveFunds).where(and(...conditions)).orderBy(desc(reserveFunds.date));
+
+  // Count total
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(reserveFunds)
+    .where(and(...conditions));
+
+  // Build order clause
+  const sortBy = pagination?.sortBy && reserveFunds[pagination.sortBy as keyof typeof reserveFunds] 
+    ? reserveFunds[pagination.sortBy as keyof typeof reserveFunds] 
+    : reserveFunds.date;
+  const orderDir = pagination?.sortOrder === 'desc' ? desc(sortBy) : asc(sortBy);
+
+  const data = await db
+    .select()
+    .from(reserveFunds)
+    .where(and(...conditions))
+    .orderBy(orderDir)
+    .limit(safeLimit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: calculatePagination(Number(count), safePage, safeLimit)
+  };
 }
 
 export async function createReserveFund(data: InsertReserveFund) {

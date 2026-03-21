@@ -5,12 +5,47 @@ import {
   suppliers, InsertSupplier,
   supplierPurchases, InsertSupplierPurchase,
 } from "../../drizzle/schema";
+import type { PaginationParams, PaginatedResult } from "./utils/pagination";
+import { calculatePagination } from "./utils/pagination";
 
 // ==================== EMPLOYEES ====================
-export async function getEmployees(userId: number) {
+export async function getEmployees(
+  userId: number, 
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof employees.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(employees).where(eq(employees.userId, userId)).orderBy(asc(employees.name));
+  if (!db) {
+    return { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false } };
+  }
+
+  const safePage = Math.max(1, pagination?.page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  // Count total
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(employees)
+    .where(eq(employees.userId, userId));
+
+  // Build order clause
+  const sortBy = pagination?.sortBy && employees[pagination.sortBy as keyof typeof employees] 
+    ? employees[pagination.sortBy as keyof typeof employees] 
+    : employees.name;
+  const orderDir = pagination?.sortOrder === 'desc' ? desc(sortBy) : asc(sortBy);
+
+  const data = await db
+    .select()
+    .from(employees)
+    .where(eq(employees.userId, userId))
+    .orderBy(orderDir)
+    .limit(safeLimit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: calculatePagination(Number(count), safePage, safeLimit)
+  };
 }
 
 export async function createEmployee(data: InsertEmployee) {
@@ -33,10 +68,43 @@ export async function deleteEmployee(id: number, userId: number) {
 }
 
 // ==================== SUPPLIERS ====================
-export async function getSuppliers(userId: number) {
+export async function getSuppliers(
+  userId: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof suppliers.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(suppliers).where(eq(suppliers.userId, userId)).orderBy(asc(suppliers.name));
+  if (!db) {
+    return { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false } };
+  }
+
+  const safePage = Math.max(1, pagination?.page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  // Count total
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(suppliers)
+    .where(eq(suppliers.userId, userId));
+
+  // Build order clause
+  const sortBy = pagination?.sortBy && suppliers[pagination.sortBy as keyof typeof suppliers] 
+    ? suppliers[pagination.sortBy as keyof typeof suppliers] 
+    : suppliers.name;
+  const orderDir = pagination?.sortOrder === 'desc' ? desc(sortBy) : asc(sortBy);
+
+  const data = await db
+    .select()
+    .from(suppliers)
+    .where(eq(suppliers.userId, userId))
+    .orderBy(orderDir)
+    .limit(safeLimit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: calculatePagination(Number(count), safePage, safeLimit)
+  };
 }
 
 export async function createSupplier(data: InsertSupplier) {
@@ -59,15 +127,52 @@ export async function deleteSupplier(id: number, userId: number) {
 }
 
 // ==================== SUPPLIER PURCHASES ====================
-export async function getSupplierPurchases(userId: number, month?: number, year?: number) {
+export async function getSupplierPurchases(
+  userId: number, 
+  month?: number, 
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof supplierPurchases.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    return { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false } };
+  }
+
+  const safePage = Math.max(1, pagination?.page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const offset = (safePage - 1) * safeLimit;
+
+  // Build conditions
   const conditions = [eq(supplierPurchases.userId, userId)];
   if (month !== undefined && year !== undefined) {
     conditions.push(sql`EXTRACT(MONTH FROM ${supplierPurchases.dueDate}::date) = ${month}`);
     conditions.push(sql`EXTRACT(YEAR FROM ${supplierPurchases.dueDate}::date) = ${year}`);
   }
-  return db.select().from(supplierPurchases).where(and(...conditions)).orderBy(desc(supplierPurchases.dueDate));
+
+  // Count total
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(supplierPurchases)
+    .where(and(...conditions));
+
+  // Build order clause
+  const sortBy = pagination?.sortBy && supplierPurchases[pagination.sortBy as keyof typeof supplierPurchases] 
+    ? supplierPurchases[pagination.sortBy as keyof typeof supplierPurchases] 
+    : supplierPurchases.dueDate;
+  const orderDir = pagination?.sortOrder === 'desc' ? desc(sortBy) : asc(sortBy);
+
+  const data = await db
+    .select()
+    .from(supplierPurchases)
+    .where(and(...conditions))
+    .orderBy(orderDir)
+    .limit(safeLimit)
+    .offset(offset);
+
+  return {
+    data,
+    pagination: calculatePagination(Number(count), safePage, safeLimit)
+  };
 }
 
 export async function createSupplierPurchase(data: InsertSupplierPurchase) {
