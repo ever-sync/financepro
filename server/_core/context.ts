@@ -16,18 +16,18 @@ const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY ?? "";
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
 
 /**
- * On first Supabase login, if the new user doesn't exist in our DB yet but
- * there is exactly one legacy user, migrate that legacy user's openId to the
- * Supabase user's id so all existing data stays linked.
+ * If there is a legacy (non-Supabase) user in the DB, migrate it to use the
+ * Supabase openId. This preserves all existing data linked to that user.
+ * If a new empty Supabase user was already auto-created, it gets removed first.
  */
 async function migrateExistingUserIfNeeded(supabaseOpenId: string): Promise<void> {
-  const existing = await db.getUserByOpenId(supabaseOpenId);
-  if (existing) return; // already migrated or already exists
-
-  const legacyUser = await db.getSingleLegacyUser();
+  const legacyUser = await db.getLegacyUser();
   if (!legacyUser) return; // no legacy user to migrate
 
-  await db.updateUserOpenId(legacyUser.id, supabaseOpenId);
+  // Already migrated (legacy user IS the supabase user)
+  if (legacyUser.openId === supabaseOpenId) return;
+
+  await db.migrateLegacyUserToSupabase(legacyUser.id, supabaseOpenId);
   console.log(`[Auth] Migrated legacy user id=${legacyUser.id} openId="${legacyUser.openId}" → "${supabaseOpenId}"`);
 }
 

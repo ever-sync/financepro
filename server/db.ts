@@ -193,20 +193,38 @@ export async function getUserByOpenId(openId: string) {
 }
 
 /**
- * Returns the single existing user if there is exactly one in the DB.
- * Used to migrate legacy (pre-Supabase) accounts on first login.
+ * Returns the first legacy (non-Supabase) user in the DB.
  */
-export async function getSingleLegacyUser() {
+export async function getLegacyUser() {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).limit(2);
-  return result.length === 1 ? result[0] : undefined;
+  const result = await db.select().from(users)
+    .where(ne(users.loginMethod, "supabase"))
+    .limit(1);
+  if (result.length > 0) return result[0];
+  const nullResult = await db.select().from(users)
+    .where(sql`${users.loginMethod} IS NULL`)
+    .limit(1);
+  return nullResult.length > 0 ? nullResult[0] : undefined;
 }
 
-export async function updateUserOpenId(userId: number, newOpenId: string) {
+/**
+ * Migrates a legacy user to a new Supabase openId.
+ * If a Supabase user record already exists (empty), it gets deleted first
+ * so the legacy user can take its openId without unique constraint violation.
+ */
+export async function migrateLegacyUserToSupabase(legacyUserId: number, supabaseOpenId: string) {
   const db = await getDb();
   if (!db) return;
-  await db.update(users).set({ openId: newOpenId }).where(eq(users.id, userId));
+  // Remove any empty Supabase user that was auto-created
+  await db.delete(users).where(
+    and(eq(users.openId, supabaseOpenId), ne(users.id, legacyUserId))
+  );
+  // Now update the legacy user to use the Supabase openId
+  await db.update(users).set({
+    openId: supabaseOpenId,
+    loginMethod: "supabase",
+  }).where(eq(users.id, legacyUserId));
 }
 
 // ==================== SETTINGS ====================
