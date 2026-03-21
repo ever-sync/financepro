@@ -34,17 +34,16 @@ async function migrateExistingUserIfNeeded(supabaseOpenId: string): Promise<void
 async function authenticateSupabaseRequest(
   req: CreateExpressContextOptions["req"]
 ): Promise<User | null> {
-  const authHeader = req.headers.authorization;
+  const authHeader = (req.headers as Record<string, string | undefined>)["authorization"];
   if (!authHeader?.startsWith("Bearer ")) return null;
 
   const token = authHeader.slice(7);
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data.user) return null;
+  const { data: { user: supaAuthUser }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !supaAuthUser) return null;
 
-  const supaUser = data.user;
-  const openId = supaUser.id;
-  const name = supaUser.user_metadata?.name || supaUser.email?.split("@")[0] || "Usuário";
-  const email = supaUser.email ?? null;
+  const openId = supaAuthUser.id;
+  const name = supaAuthUser.user_metadata?.name || supaAuthUser.email?.split("@")[0] || "Usuário";
+  const email = supaAuthUser.email ?? null;
 
   // Migrate legacy user data if this is the first Supabase login
   await migrateExistingUserIfNeeded(openId);
@@ -67,7 +66,7 @@ export async function createContext(
   let user: User | null = null;
 
   try {
-    user = await authenticateSupabaseRequest(opts);
+    user = await authenticateSupabaseRequest(opts.req);
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;
