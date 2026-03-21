@@ -75,7 +75,7 @@ const SIDEBAR_STYLE = {
 
 const useSidebarSections = () => {
   const { t } = useTranslation();
-  
+
   return useMemo(() => [
     {
       label: t('navigation.dashboard'),
@@ -116,8 +116,6 @@ const useSidebarSections = () => {
     },
   ], [t]);
 };
-
-const allSidebarItems = useSidebarSections().flatMap(section => section.items);
 
 function getInitialSidebarOpen() {
   if (typeof document === "undefined") return false;
@@ -187,15 +185,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const isMobile = useIsMobile();
+  const sidebarSections = useSidebarSections();
 
   const activeMenuItem = useMemo(
-    () => allSidebarItems.find(item => item.path === location),
-    [location]
+    () => sidebarSections.flatMap(section => section.items).find(item => item.path === location),
+    [location, sidebarSections]
   );
 
   return (
     <>
       <DashboardSidebar
+        sections={sidebarSections}
         location={location}
         onNavigate={setLocation}
         onLogout={logout}
@@ -221,12 +221,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function DashboardSidebar({
+  sections,
   location,
   onNavigate,
   onLogout,
   userName,
   userEmail,
 }: {
+  sections: SidebarSection[];
   location: string;
   onNavigate: (path: string) => void;
   onLogout: () => void;
@@ -285,7 +287,7 @@ function DashboardSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-2 pb-2">
-        {useSidebarSections().map(section => (
+        {sections.map(section => (
           <SidebarGroup key={section.label} className="px-0 py-2">
             <SidebarGroupLabel className="px-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-400 group-data-[collapsible=icon]:hidden">
               {section.label}
