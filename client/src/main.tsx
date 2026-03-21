@@ -7,6 +7,7 @@ import superjson from "superjson";
 import App from "./App";
 import { injectAnalytics } from "./lib/analytics";
 import { getLoginUrl } from "./const";
+import "./i18n";
 import "./index.css";
 
 const queryClient = new QueryClient();

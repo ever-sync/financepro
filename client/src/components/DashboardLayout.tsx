@@ -21,6 +21,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import {
   Building2,
   CalendarDays,
@@ -46,6 +47,7 @@ import {
 import { CSSProperties, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { LanguageSwitcher } from "./language-switcher";
 
 type SidebarItem = {
   icon: LucideIcon;
@@ -71,47 +73,51 @@ const SIDEBAR_STYLE = {
   "--sidebar-ring": "oklch(0.58 0.02 260)",
 } as CSSProperties;
 
-const sidebarSections: SidebarSection[] = [
-  {
-    label: "Dashboards",
-    items: [
-      { icon: LayoutDashboard, label: "Dashboard Empresa", path: "/" },
-      { icon: User, label: "Dashboard Pessoal", path: "/pessoal" },
-    ],
-  },
-  {
-    label: "Empresa",
-    items: [
-      { icon: DollarSign, label: "Receitas", path: "/receitas" },
-      { icon: Building2, label: "Custos Fixos", path: "/custos-fixos" },
-      { icon: Receipt, label: "Custos Variáveis", path: "/custos-variaveis" },
-      { icon: Users, label: "Funcionários", path: "/funcionarios" },
-      { icon: Truck, label: "Fornecedores", path: "/fornecedores" },
-      { icon: UserCheck, label: "Clientes", path: "/clientes" },
-      { icon: Briefcase, label: "Serviços", path: "/servicos" },
-    ],
-  },
-  {
-    label: "Pessoal",
-    items: [
-      { icon: Wallet, label: "Contas Fixas", path: "/contas-fixas" },
-      { icon: Receipt, label: "Contas Variáveis", path: "/contas-variaveis" },
-      { icon: TrendingDown, label: "Dívidas", path: "/dividas" },
-      { icon: TrendingUp, label: "Investimentos", path: "/investimentos" },
-      { icon: PiggyBank, label: "Fundo de Reserva", path: "/fundo-reserva" },
-    ],
-  },
-  {
-    label: "Ferramentas",
-    items: [
-      { icon: FileText, label: "DRE", path: "/dre" },
-      { icon: CalendarDays, label: "Calendário", path: "/calendario" },
-      { icon: Settings, label: "Configurações", path: "/configuracoes" },
-    ],
-  },
-];
+const useSidebarSections = () => {
+  const { t } = useTranslation();
+  
+  return useMemo(() => [
+    {
+      label: t('navigation.dashboard'),
+      items: [
+        { icon: LayoutDashboard, label: t('dashboard.title'), path: "/" },
+        { icon: User, label: t('navigation.profile'), path: "/pessoal" },
+      ],
+    },
+    {
+      label: "Empresa",
+      items: [
+        { icon: DollarSign, label: t('navigation.revenues'), path: "/receitas" },
+        { icon: Building2, label: t('costs.fixedCosts'), path: "/custos-fixos" },
+        { icon: Receipt, label: t('costs.variableCosts'), path: "/custos-variaveis" },
+        { icon: Users, label: t('navigation.employees'), path: "/funcionarios" },
+        { icon: Truck, label: t('navigation.suppliers'), path: "/fornecedores" },
+        { icon: UserCheck, label: t('navigation.clients'), path: "/clientes" },
+        { icon: Briefcase, label: t('navigation.services'), path: "/servicos" },
+      ],
+    },
+    {
+      label: "Pessoal",
+      items: [
+        { icon: Wallet, label: t('costs.fixedCosts'), path: "/contas-fixas" },
+        { icon: Receipt, label: t('costs.variableCosts'), path: "/contas-variaveis" },
+        { icon: TrendingDown, label: t('navigation.debts'), path: "/dividas" },
+        { icon: TrendingUp, label: t('navigation.investments'), path: "/investimentos" },
+        { icon: PiggyBank, label: t('dashboard.reservedFund'), path: "/fundo-reserva" },
+      ],
+    },
+    {
+      label: t('navigation.tools') || "Ferramentas",
+      items: [
+        { icon: FileText, label: "DRE", path: "/dre" },
+        { icon: CalendarDays, label: t('navigation.calendar') || "Calendário", path: "/calendario" },
+        { icon: Settings, label: t('navigation.settings'), path: "/configuracoes" },
+      ],
+    },
+  ], [t]);
+};
 
-const allSidebarItems = sidebarSections.flatMap(section => section.items);
+const allSidebarItems = useSidebarSections().flatMap(section => section.items);
 
 function getInitialSidebarOpen() {
   if (typeof document === "undefined") return false;
@@ -279,7 +285,7 @@ function DashboardSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-2 pb-2">
-        {sidebarSections.map(section => (
+        {useSidebarSections().map(section => (
           <SidebarGroup key={section.label} className="px-0 py-2">
             <SidebarGroupLabel className="px-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-400 group-data-[collapsible=icon]:hidden">
               {section.label}
@@ -376,6 +382,7 @@ function DashboardSidebar({
               >
                 <Settings className="size-4" />
               </Button>
+              <LanguageSwitcher />
               <Button
                 type="button"
                 variant="ghost"
