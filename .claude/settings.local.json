@@ -18,7 +18,12 @@
       "Bash(done)",
       "Bash(xargs grep:*)",
       "Bash(npx pnpm:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(gh api:*)",
+      "Bash(node -e \"const d=[];process.stdin.on\\(''''data'''',c=>d.push\\(c\\)\\);process.stdin.on\\(''''end'''',\\(\\)=>{try{const r=JSON.parse\\(d.join\\(''''''''\\)\\);console.log\\(''''repo:'''',r.full_name\\);console.log\\(''''default_branch:'''',r.default_branch\\)}catch\\(e\\){console.log\\(''''could not parse''''\\)}}\\)\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
