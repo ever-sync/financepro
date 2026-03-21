@@ -11,7 +11,11 @@
       "Bash(npm run:*)",
       "Bash(node_modules/.bin/drizzle-kit migrate:*)",
       "Bash(node_modules/.bin/drizzle-kit generate:*)",
-      "Bash(pnpm install:*)"
+      "Bash(pnpm install:*)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Bash(git show:*)",
+      "Bash(done)"
     ]
   }
 }
