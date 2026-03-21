@@ -16,7 +16,8 @@
       "Bash(do echo:*)",
       "Bash(git show:*)",
       "Bash(done)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npx pnpm:*)"
     ]
   }
 }
