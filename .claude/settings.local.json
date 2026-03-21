@@ -17,7 +17,8 @@
       "Bash(git show:*)",
       "Bash(done)",
       "Bash(xargs grep:*)",
-      "Bash(npx pnpm:*)"
+      "Bash(npx pnpm:*)",
+      "Bash(node -e \":*)"
     ]
   }
 }
