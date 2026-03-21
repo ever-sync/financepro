@@ -11,6 +11,7 @@ target/
 
 # Build artifacts
 dist/
+public/
 build/
 *.pyc
 *.class
