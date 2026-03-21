@@ -192,6 +192,23 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Returns the single existing user if there is exactly one in the DB.
+ * Used to migrate legacy (pre-Supabase) accounts on first login.
+ */
+export async function getSingleLegacyUser() {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).limit(2);
+  return result.length === 1 ? result[0] : undefined;
+}
+
+export async function updateUserOpenId(userId: number, newOpenId: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ openId: newOpenId }).where(eq(users.id, userId));
+}
+
 // ==================== SETTINGS ====================
 export async function getSettings(userId: number) {
   const db = await getDb();

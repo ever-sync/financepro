@@ -1,4 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +17,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
+import { useSupabaseAuth } from "@/lib/auth";
 import { useIsMobile } from "@/hooks/useMobile";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -46,6 +45,7 @@ import {
 } from "lucide-react";
 import { CSSProperties, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import AuthPage from "@/pages/Auth";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { LanguageSwitcher } from "./language-switcher";
 
@@ -135,44 +135,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarDefaultOpen] = useState(getInitialSidebarOpen);
-  const { loading, user } = useAuth();
+  const { loading, user } = useSupabaseAuth();
 
   if (loading) return <DashboardLayoutSkeleton />;
 
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex w-full max-w-md flex-col items-center gap-8 p-8">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-              <DollarSign className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-center text-2xl font-bold tracking-tight text-foreground">
-              Sistema Financeiro
-            </h1>
-            <p className="max-w-sm text-center text-sm text-muted-foreground">
-              Controle completo das finanças da sua empresa e vida pessoal. Faça
-              login para continuar.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              const loginUrl = getLoginUrl();
-              if (!loginUrl) {
-                window.location.reload();
-                return;
-              }
-              window.location.href = loginUrl;
-            }}
-            size="lg"
-            className="w-full shadow-lg transition-all hover:shadow-xl"
-          >
-            Entrar
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <AuthPage />;
 
   return (
     <SidebarProvider
@@ -185,7 +152,7 @@ export default function DashboardLayout({
 }
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useSupabaseAuth();
   const [location, setLocation] = useLocation();
   const isMobile = useIsMobile();
   const sidebarSections = useSidebarSections();
@@ -201,8 +168,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         sections={sidebarSections}
         location={location}
         onNavigate={setLocation}
-        onLogout={logout}
-        userName={user?.name ?? "Usuário"}
+        onLogout={signOut}
+        userName={user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "Usuário"}
         userEmail={user?.email ?? ""}
       />
 

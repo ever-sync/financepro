@@ -1,11 +1,10 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMonthYear } from "@/hooks/useMonthYear";
 import { formatCurrency, formatPercent } from "@/lib/format";
-import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
   ArrowDownRight,
@@ -67,14 +66,14 @@ const dashboardTabs: TabItem[] = [
 const distributionColors = ["#1f1f1f", "#f97316", "#ef4444", "#10b981"];
 
 export default function DashboardPessoal() {
-  const { user } = useAuth();
+  const { data: user } = trpc.auth.me.useQuery();
   const { month, year, monthName } = useMonthYear();
   const { data, isLoading } = trpc.dashboard.personal.useQuery({ month, year });
   const settingsData = trpc.settings.get.useQuery();
   const [activeTab, setActiveTab] = useState("Visao geral");
 
-  const userName = user?.name?.trim() || "Dev User";
-  const userEmail = user?.email?.trim() || "dev.user@...com";
+  const userName = user?.name?.trim() || "Usuário";
+  const userEmail = user?.email?.trim() || "";
 
   const proLaboreGross = parseFloat(settingsData.data?.proLaboreGross || "0");
   const tithePercent = parseFloat(settingsData.data?.tithePercent || "10");

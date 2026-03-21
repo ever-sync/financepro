@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMonthYear } from "@/hooks/useMonthYear";
-import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
   ArrowDownRight,
@@ -108,14 +107,14 @@ const dashboardTabs: TabItem[] = [
 ];
 
 export default function DashboardEmpresa() {
-  const { user } = useAuth();
+  const { data: user } = trpc.auth.me.useQuery();
   const { month, year } = useMonthYear();
   const { data, isLoading } = trpc.dashboard.company.useQuery({ month, year });
   const [activeTab, setActiveTab] = useState("Visão geral");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const userName = user?.name?.trim() || "Sajibur Rahman";
-  const userEmail = user?.email?.trim() || "sajibur.rahman@...com";
+  const userName = user?.name?.trim() || "Usuário";
+  const userEmail = user?.email?.trim() || "";
 
   const currentSummary = data?.summary?.current;
   const previousSummary = data?.summary?.previous;
