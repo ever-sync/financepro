@@ -18,8 +18,22 @@ import { toast } from "sonner";
 export default function Fornecedores() {
   const { month, year, monthName, goToPrevMonth, goToNextMonth } = useMonthYear();
   const utils = trpc.useUtils();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [orderBy, setOrderBy] = useState("dueDate");
+  const [orderDirection, setOrderDirection] = useState<"asc" | "desc">("asc");
+  
   const { data: suppliers = [], isLoading: loadingSuppliers } = trpc.suppliers.list.useQuery();
-  const { data: purchases = [], isLoading: loadingPurchases } = trpc.supplierPurchases.list.useQuery({ month, year });
+  const { data: purchasesData, isLoading: loadingPurchases } = trpc.supplierPurchases.list.useQuery({ 
+    month, 
+    year,
+    page,
+    limit,
+    orderBy,
+    orderDirection
+  });
+  const purchases = purchasesData?.data || [];
+  const pagination = purchasesData?.pagination;
   const createSupplier = trpc.suppliers.create.useMutation({ onSuccess: () => { utils.suppliers.list.invalidate(); toast.success("Fornecedor adicionado"); setOpenSupplier(false); } });
   const deleteSupplier = trpc.suppliers.delete.useMutation({ onSuccess: () => { utils.suppliers.list.invalidate(); toast.success("Removido"); } });
   const createPurchase = trpc.supplierPurchases.create.useMutation({ onSuccess: () => { utils.supplierPurchases.list.invalidate(); toast.success("Compra adicionada"); setOpenPurchase(false); } });
@@ -139,6 +153,31 @@ export default function Fornecedores() {
                   })}
                 </TableBody>
               </Table>
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={pagination.page <= 1}
+                    >
+                      Anterior
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                      disabled={pagination.page >= pagination.totalPages}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, asc, ne } from "drizzle-orm";
+import { eq, and, sql, desc, asc, ne, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { randomUUID } from "crypto";
 import postgres from "postgres";
@@ -20,6 +20,8 @@ import {
   services, InsertService,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import type { PaginationParams, PaginatedResult } from './db/utils/pagination';
+import { calculatePagination, getDefaultPagination } from './db/utils/pagination';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -249,15 +251,44 @@ export async function upsertSettings(data: InsertSettings) {
 }
 
 // ==================== REVENUES ====================
-export async function getRevenues(userId: number, month?: number, year?: number) {
+export async function getRevenues(
+  userId: number,
+  month?: number,
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof revenues.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
   const conditions = [eq(revenues.userId, userId)];
   if (month !== undefined && year !== undefined) {
     conditions.push(sql`EXTRACT(MONTH FROM ${revenues.dueDate}::date) = ${month}`);
     conditions.push(sql`EXTRACT(YEAR FROM ${revenues.dueDate}::date) = ${year}`);
   }
-  return db.select().from(revenues).where(and(...conditions)).orderBy(desc(revenues.dueDate));
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(revenues).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'dueDate';
+  const sortOrder = pagination?.sortOrder ?? 'desc';
+  
+  const orderByColumn = (revenues as any)[sortBy] || revenues.dueDate;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const data = await db.select().from(revenues)
+    .where(and(...conditions))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  
+  return {
+    data,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createRevenue(data: InsertRevenue) {
@@ -292,16 +323,40 @@ export async function updateRevenueSeries(seriesId: string, userId: number, data
 }
 
 // ==================== COMPANY FIXED COSTS ====================
-export async function getCompanyFixedCosts(userId: number, month?: number, year?: number) {
+export async function getCompanyFixedCosts(
+  userId: number,
+  month?: number,
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof companyFixedCosts.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
   const conditions = [eq(companyFixedCosts.userId, userId)];
   if (month !== undefined) conditions.push(eq(companyFixedCosts.month, month));
   if (year !== undefined) conditions.push(eq(companyFixedCosts.year, year));
-  const existing = await db.select().from(companyFixedCosts).where(and(...conditions)).orderBy(asc(companyFixedCosts.dueDay));
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(companyFixedCosts).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'dueDay';
+  const sortOrder = pagination?.sortOrder ?? 'asc';
+  
+  const orderByColumn = (companyFixedCosts as any)[sortBy] || companyFixedCosts.dueDay;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const existing = await db.select().from(companyFixedCosts)
+    .where(and(...conditions))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
 
   // Auto-propagate: if querying a specific month with no records, copy from most recent month
-  if (existing.length === 0 && month !== undefined && year !== undefined) {
+  if (existing.length === 0 && month !== undefined && year !== undefined && page === 1) {
     const allRecords = await db.select().from(companyFixedCosts)
       .where(eq(companyFixedCosts.userId, userId))
       .orderBy(desc(companyFixedCosts.year), desc(companyFixedCosts.month));
@@ -313,11 +368,25 @@ export async function getCompanyFixedCosts(userId: number, month?: number, year?
         await db.insert(companyFixedCosts).values(
           templates.map(t => ({ userId, description: t.description, category: t.category, amount: t.amount, dueDay: t.dueDay, month, year, status: "pendente" as const }))
         );
-        return db.select().from(companyFixedCosts).where(and(...conditions)).orderBy(asc(companyFixedCosts.dueDay));
+        const newData = await db.select().from(companyFixedCosts)
+          .where(and(...conditions))
+          .orderBy(orderFunc(orderByColumn))
+          .limit(limit)
+          .offset((page - 1) * limit);
+        
+        const newCountResult = await db.select({ count: count() }).from(companyFixedCosts).where(and(...conditions));
+        return {
+          data: newData,
+          pagination: calculatePagination(page, limit, Number(newCountResult[0]?.count ?? 0)),
+        };
       }
     }
   }
-  return existing;
+  
+  return {
+    data: existing,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createCompanyFixedCost(data: InsertCompanyFixedCost) {
@@ -340,15 +409,44 @@ export async function deleteCompanyFixedCost(id: number, userId: number) {
 }
 
 // ==================== COMPANY VARIABLE COSTS ====================
-export async function getCompanyVariableCosts(userId: number, month?: number, year?: number) {
+export async function getCompanyVariableCosts(
+  userId: number,
+  month?: number,
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof companyVariableCosts.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
   const conditions = [eq(companyVariableCosts.userId, userId)];
   if (month !== undefined && year !== undefined) {
     conditions.push(sql`EXTRACT(MONTH FROM ${companyVariableCosts.date}::date) = ${month}`);
     conditions.push(sql`EXTRACT(YEAR FROM ${companyVariableCosts.date}::date) = ${year}`);
   }
-  return db.select().from(companyVariableCosts).where(and(...conditions)).orderBy(desc(companyVariableCosts.date));
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(companyVariableCosts).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'date';
+  const sortOrder = pagination?.sortOrder ?? 'desc';
+  
+  const orderByColumn = (companyVariableCosts as any)[sortBy] || companyVariableCosts.date;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const data = await db.select().from(companyVariableCosts)
+    .where(and(...conditions))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  
+  return {
+    data,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createCompanyVariableCost(data: InsertCompanyVariableCost) {
@@ -382,10 +480,36 @@ export async function deleteCompanyVariableCost(id: number, userId: number) {
 }
 
 // ==================== EMPLOYEES ====================
-export async function getEmployees(userId: number) {
+export async function getEmployees(
+  userId: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof employees.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(employees).where(eq(employees.userId, userId)).orderBy(asc(employees.name));
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(employees).where(eq(employees.userId, userId));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'name';
+  const sortOrder = pagination?.sortOrder ?? 'asc';
+  
+  const orderByColumn = (employees as any)[sortBy] || employees.name;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const data = await db.select().from(employees)
+    .where(eq(employees.userId, userId))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  
+  return {
+    data,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createEmployee(data: InsertEmployee) {
@@ -408,10 +532,36 @@ export async function deleteEmployee(id: number, userId: number) {
 }
 
 // ==================== SUPPLIERS ====================
-export async function getSuppliers(userId: number) {
+export async function getSuppliers(
+  userId: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof suppliers.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(suppliers).where(eq(suppliers.userId, userId)).orderBy(asc(suppliers.name));
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(suppliers).where(eq(suppliers.userId, userId));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'name';
+  const sortOrder = pagination?.sortOrder ?? 'asc';
+  
+  const orderByColumn = (suppliers as any)[sortBy] || suppliers.name;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const data = await db.select().from(suppliers)
+    .where(eq(suppliers.userId, userId))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  
+  return {
+    data,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createSupplier(data: InsertSupplier) {
@@ -434,15 +584,44 @@ export async function deleteSupplier(id: number, userId: number) {
 }
 
 // ==================== SUPPLIER PURCHASES ====================
-export async function getSupplierPurchases(userId: number, month?: number, year?: number) {
+export async function getSupplierPurchases(
+  userId: number,
+  month?: number,
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof supplierPurchases.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
   const conditions = [eq(supplierPurchases.userId, userId)];
   if (month !== undefined && year !== undefined) {
     conditions.push(sql`EXTRACT(MONTH FROM ${supplierPurchases.dueDate}::date) = ${month}`);
     conditions.push(sql`EXTRACT(YEAR FROM ${supplierPurchases.dueDate}::date) = ${year}`);
   }
-  return db.select().from(supplierPurchases).where(and(...conditions)).orderBy(desc(supplierPurchases.dueDate));
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(supplierPurchases).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'dueDate';
+  const sortOrder = pagination?.sortOrder ?? 'desc';
+  
+  const orderByColumn = (supplierPurchases as any)[sortBy] || supplierPurchases.dueDate;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const data = await db.select().from(supplierPurchases)
+    .where(and(...conditions))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  
+  return {
+    data,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createSupplierPurchase(data: InsertSupplierPurchase) {
@@ -465,16 +644,40 @@ export async function deleteSupplierPurchase(id: number, userId: number) {
 }
 
 // ==================== PERSONAL FIXED COSTS ====================
-export async function getPersonalFixedCosts(userId: number, month?: number, year?: number) {
+export async function getPersonalFixedCosts(
+  userId: number,
+  month?: number,
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof personalFixedCosts.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
   const conditions = [eq(personalFixedCosts.userId, userId)];
   if (month !== undefined) conditions.push(eq(personalFixedCosts.month, month));
   if (year !== undefined) conditions.push(eq(personalFixedCosts.year, year));
-  const existing = await db.select().from(personalFixedCosts).where(and(...conditions)).orderBy(asc(personalFixedCosts.dueDay));
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(personalFixedCosts).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'dueDay';
+  const sortOrder = pagination?.sortOrder ?? 'asc';
+  
+  const orderByColumn = (personalFixedCosts as any)[sortBy] || personalFixedCosts.dueDay;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const existing = await db.select().from(personalFixedCosts)
+    .where(and(...conditions))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
 
   // Auto-propagate: if querying a specific month with no records, copy from most recent month
-  if (existing.length === 0 && month !== undefined && year !== undefined) {
+  if (existing.length === 0 && month !== undefined && year !== undefined && page === 1) {
     const allRecords = await db.select().from(personalFixedCosts)
       .where(eq(personalFixedCosts.userId, userId))
       .orderBy(desc(personalFixedCosts.year), desc(personalFixedCosts.month));
@@ -486,11 +689,25 @@ export async function getPersonalFixedCosts(userId: number, month?: number, year
         await db.insert(personalFixedCosts).values(
           templates.map(t => ({ userId, description: t.description, category: t.category, amount: t.amount, dueDay: t.dueDay, month, year, status: "pendente" as const }))
         );
-        return db.select().from(personalFixedCosts).where(and(...conditions)).orderBy(asc(personalFixedCosts.dueDay));
+        const newData = await db.select().from(personalFixedCosts)
+          .where(and(...conditions))
+          .orderBy(orderFunc(orderByColumn))
+          .limit(limit)
+          .offset((page - 1) * limit);
+        
+        const newCountResult = await db.select({ count: count() }).from(personalFixedCosts).where(and(...conditions));
+        return {
+          data: newData,
+          pagination: calculatePagination(page, limit, Number(newCountResult[0]?.count ?? 0)),
+        };
       }
     }
   }
-  return existing;
+  
+  return {
+    data: existing,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createPersonalFixedCost(data: InsertPersonalFixedCost) {
@@ -513,15 +730,44 @@ export async function deletePersonalFixedCost(id: number, userId: number) {
 }
 
 // ==================== PERSONAL VARIABLE COSTS ====================
-export async function getPersonalVariableCosts(userId: number, month?: number, year?: number) {
+export async function getPersonalVariableCosts(
+  userId: number,
+  month?: number,
+  year?: number,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<typeof personalVariableCosts.$inferSelect>> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { data: [], pagination: calculatePagination(1, 20, 0) };
+  
   const conditions = [eq(personalVariableCosts.userId, userId)];
   if (month !== undefined && year !== undefined) {
     conditions.push(sql`EXTRACT(MONTH FROM ${personalVariableCosts.date}::date) = ${month}`);
     conditions.push(sql`EXTRACT(YEAR FROM ${personalVariableCosts.date}::date) = ${year}`);
   }
-  return db.select().from(personalVariableCosts).where(and(...conditions)).orderBy(desc(personalVariableCosts.date));
+  
+  // Contagem total
+  const countResult = await db.select({ count: count() }).from(personalVariableCosts).where(and(...conditions));
+  const total = countResult[0]?.count ?? 0;
+  
+  // Paginação e ordenação
+  const page = pagination?.page ?? 1;
+  const limit = pagination?.limit ?? 20;
+  const sortBy = pagination?.sortBy ?? 'date';
+  const sortOrder = pagination?.sortOrder ?? 'desc';
+  
+  const orderByColumn = (personalVariableCosts as any)[sortBy] || personalVariableCosts.date;
+  const orderFunc = sortOrder === 'asc' ? asc : desc;
+  
+  const data = await db.select().from(personalVariableCosts)
+    .where(and(...conditions))
+    .orderBy(orderFunc(orderByColumn))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  
+  return {
+    data,
+    pagination: calculatePagination(page, limit, Number(total)),
+  };
 }
 
 export async function createPersonalVariableCost(data: InsertPersonalVariableCost) {

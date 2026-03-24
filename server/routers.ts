@@ -241,8 +241,15 @@ export const appRouter = router({
   // ==================== SUPPLIER PURCHASES ====================
   supplierPurchases: router({
     list: protectedProcedure
-      .input(z.object({ month: z.number().optional(), year: z.number().optional() }))
-      .query(({ ctx, input }) => db.getSupplierPurchases(ctx.user.id, input.month, input.year)),
+      .input(z.object({ 
+        month: z.number().optional(), 
+        year: z.number().optional(),
+        page: z.number().optional().default(1),
+        limit: z.number().optional().default(50),
+        orderBy: z.string().optional().default("dueDate"),
+        orderDirection: z.enum(["asc", "desc"]).optional().default("asc")
+      }))
+      .query(({ ctx, input }) => db.getSupplierPurchases(ctx.user.id, input)),
     create: protectedProcedure
       .input(z.object({
         supplierId: z.number(),
