@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Truck } from "lucide-react";
+import { Plus, Trash2, Truck, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -119,10 +119,46 @@ export default function Fornecedores() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Fornecedor</TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => {
+                      if (orderBy === "supplierId") {
+                        setOrderDirection(orderDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setOrderBy("supplierId");
+                        setOrderDirection("asc");
+                      }
+                    }}>
+                      Fornecedor
+                      {orderBy === "supplierId" && (
+                        orderDirection === "asc" ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />
+                      )}
+                    </TableHead>
                     <TableHead>Descrição</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Vencimento</TableHead>
+                    <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => {
+                      if (orderBy === "amount") {
+                        setOrderDirection(orderDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setOrderBy("amount");
+                        setOrderDirection("asc");
+                      }
+                    }}>
+                      Valor
+                      {orderBy === "amount" && (
+                        orderDirection === "asc" ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />
+                      )}
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => {
+                      if (orderBy === "dueDate") {
+                        setOrderDirection(orderDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setOrderBy("dueDate");
+                        setOrderDirection("asc");
+                      }
+                    }}>
+                      Vencimento
+                      {orderBy === "dueDate" && (
+                        orderDirection === "asc" ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />
+                      )}
+                    </TableHead>
                     <TableHead>Pgto</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
