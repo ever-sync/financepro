@@ -546,6 +546,31 @@ export const appRouter = router({
       .input(z.object({ month: z.number(), year: z.number() }))
       .query(({ ctx, input }) => db.getCalendarData(ctx.user.id, input.month, input.year)),
   }),
+
+  // ==================== FINANCIAL ANALYSIS (IA) ====================
+  financialAnalysis: router({
+    analyze: protectedProcedure
+      .input(z.object({ 
+        month: z.number().optional(), 
+        year: z.number().optional() 
+      }))
+      .query(async ({ ctx, input }) => {
+        const { analyzeFinancialData } = await import("./db/repositories/financial-analysis");
+        return analyzeFinancialData(ctx.user.id, input.month, input.year);
+      }),
+    
+    sendWhatsApp: protectedProcedure
+      .input(z.object({ 
+        phoneNumber: z.string().min(10),
+        month: z.number().optional(), 
+        year: z.number().optional() 
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { analyzeFinancialData, sendFinancialAlertToWhatsApp } = await import("./db/repositories/financial-analysis");
+        const analysis = await analyzeFinancialData(ctx.user.id, input.month, input.year);
+        return sendFinancialAlertToWhatsApp(ctx.user.id, input.phoneNumber, analysis);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
