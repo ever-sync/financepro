@@ -9,6 +9,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/trpc/:path*", "destination": "/api/trpc/[trpc]" }
+    { "source": "/api/trpc/:path*", "destination": "/api/trpc/[trpc]" },
+    { "source": "/((?!api/|assets/|favicon\\.svg$).*)", "destination": "/index.html" }
   ]
 }
