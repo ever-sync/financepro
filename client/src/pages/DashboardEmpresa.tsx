@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { useSupabaseAuth } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,7 +108,7 @@ const dashboardTabs: TabItem[] = [
 ];
 
 export default function DashboardEmpresa() {
-  const { data: user } = trpc.auth.me.useQuery();
+  const { user } = useSupabaseAuth();
   const { month, year } = useMonthYear();
   const { data, isLoading } = trpc.dashboard.company.useQuery({ month, year });
   const [activeTab, setActiveTab] = useState("Visão geral");

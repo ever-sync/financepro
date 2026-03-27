@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
 import {
   Sidebar,
   SidebarContent,
@@ -42,6 +43,8 @@ import {
   PiggyBank,
   Briefcase,
   UserCheck,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { CSSProperties, useMemo, useState } from "react";
 import { useLocation } from "wouter";
@@ -135,11 +138,76 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarDefaultOpen] = useState(getInitialSidebarOpen);
-  const { loading, user } = useSupabaseAuth();
+  const { loading, user, signOut } = useSupabaseAuth();
+  const appUserQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: !loading && !!user,
+    retry: 2,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
 
   if (loading) return <DashboardLayoutSkeleton />;
 
   if (!user) return <AuthPage />;
+
+  if (appUserQuery.error || !appUserQuery.data) {
+    if (appUserQuery.isLoading) {
+      return (
+        <SidebarProvider
+          defaultOpen={sidebarDefaultOpen}
+          style={SIDEBAR_STYLE}
+        >
+          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        </SidebarProvider>
+      );
+    }
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f4f2] p-4">
+        <div className="w-full max-w-lg rounded-[28px] border border-zinc-200 bg-white p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertCircle className="size-7" />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-900">
+            Sessão sem sincronização
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">
+            Seu login existe no navegador, mas o servidor não conseguiu validar o usuário da aplicação.
+            Enquanto isso acontecer, os dados protegidos podem aparecer vazios no front-end.
+          </p>
+          {appUserQuery.error ? (
+            <p className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              {appUserQuery.error.message}
+            </p>
+          ) : null}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button
+              className="sm:flex-1"
+              onClick={() => appUserQuery.refetch()}
+              disabled={appUserQuery.isFetching}
+            >
+              {appUserQuery.isFetching ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Tentando novamente...
+                </>
+              ) : (
+                "Tentar novamente"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="sm:flex-1"
+              onClick={() => signOut()}
+            >
+              Sair e entrar de novo
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider

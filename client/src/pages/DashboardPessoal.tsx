@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { useSupabaseAuth } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,18 +67,17 @@ const dashboardTabs: TabItem[] = [
 const distributionColors = ["#1f1f1f", "#f97316", "#ef4444", "#10b981"];
 
 export default function DashboardPessoal() {
-  const { data: user } = trpc.auth.me.useQuery();
+  const { user } = useSupabaseAuth();
   const { month, year, monthName } = useMonthYear();
   const { data, isLoading } = trpc.dashboard.personal.useQuery({ month, year });
-  const settingsData = trpc.settings.get.useQuery();
   const [activeTab, setActiveTab] = useState("Visao geral");
 
   const userName = user?.name?.trim() || "Usuário";
   const userEmail = user?.email?.trim() || "";
 
-  const proLaboreGross = parseFloat(settingsData.data?.proLaboreGross || "0");
-  const tithePercent = parseFloat(settingsData.data?.tithePercent || "10");
-  const investPercent = parseFloat(settingsData.data?.investmentPercent || "10");
+  const proLaboreGross = parseFloat(data?.settings?.proLaboreGross || "0");
+  const tithePercent = parseFloat(data?.settings?.tithePercent || "10");
+  const investPercent = parseFloat(data?.settings?.investmentPercent || "10");
   const tithe = proLaboreGross * (tithePercent / 100);
   const investPersonal = proLaboreGross * (investPercent / 100);
   const proLaboreNet = proLaboreGross - tithe - investPersonal;
