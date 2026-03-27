@@ -1,12 +1,29 @@
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { getSessionCookieOptions } from "./_core/cookies";
 import { z } from "zod";
 import * as db from "./db";
+import * as asaas from "./asaas";
+import { COOKIE_NAME } from "../shared/const";
+
+function getRequestOrigin(headers: Record<string, unknown>) {
+  const host = String(headers["x-forwarded-host"] || headers.host || "");
+  if (!host) return null;
+  const protocol = String(headers["x-forwarded-proto"] || "https");
+  return `${protocol}://${host}`;
+}
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    logout: protectedProcedure.mutation(({ ctx }) => {
+      ctx.res.clearCookie(COOKIE_NAME, {
+        ...getSessionCookieOptions(ctx.req),
+        maxAge: -1,
+      });
+      return { success: true };
+    }),
   }),
 
   // ==================== SETTINGS ====================
@@ -40,7 +57,7 @@ export const appRouter = router({
         client: z.string().optional(),
         dueDate: z.string(),
         receivedDate: z.string().nullable().optional(),
-        status: z.enum(["pendente", "recebido", "atrasado"]).optional(),
+        status: z.enum(["pendente", "recebido", "atrasado", "cancelado"]).optional(),
         seriesId: z.string().optional(),
         notes: z.string().optional(),
       }))
@@ -56,7 +73,7 @@ export const appRouter = router({
         client: z.string().nullable().optional(),
         dueDate: z.string().optional(),
         receivedDate: z.string().nullable().optional(),
-        status: z.enum(["pendente", "recebido", "atrasado"]).optional(),
+        status: z.enum(["pendente", "recebido", "atrasado", "cancelado"]).optional(),
         notes: z.string().nullable().optional(),
       }))
       .mutation(({ ctx, input }) => {
@@ -528,6 +545,121 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ ctx, input }) => db.deleteService(input.id, ctx.user.id)),
+  }),
+
+  // ==================== ASAAS INTEGRATION ====================
+  asaasIntegration: router({
+    get: protectedProcedure.query(({ ctx }) =>
+      asaas.getAsaasIntegration(ctx.user.id, getRequestOrigin(ctx.req.headers as Record<string, unknown>))
+    ),
+    upsert: protectedProcedure
+      .input(
+        z.object({
+          accountName: z.string().min(1).optional(),
+          environment: z.enum(["sandbox", "production"]),
+          apiKey: z.string().min(1).optional(),
+          webhookAuthToken: z.string().optional(),
+          enabled: z.boolean().optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        asaas.upsertAsaasIntegration(
+          ctx.user.id,
+          input,
+          getRequestOrigin(ctx.req.headers as Record<string, unknown>)
+        )
+      ),
+    testConnection: protectedProcedure.mutation(({ ctx }) => asaas.testAsaasConnection(ctx.user.id)),
+    syncStatus: protectedProcedure.query(({ ctx }) => asaas.getAsaasSyncStatus(ctx.user.id)),
+  }),
+
+  asaasCustomers: router({
+    syncOne: protectedProcedure
+      .input(z.object({ clientId: z.number() }))
+      .mutation(({ ctx, input }) => asaas.syncAsaasCustomer(ctx.user.id, input.clientId)),
+    syncAll: protectedProcedure.mutation(({ ctx }) => asaas.syncAllAsaasCustomers(ctx.user.id)),
+  }),
+
+  asaasCharges: router({
+    list: protectedProcedure.query(({ ctx }) => asaas.listAsaasCharges(ctx.user.id)),
+    create: protectedProcedure
+      .input(
+        z.object({
+          clientId: z.number(),
+          serviceId: z.number().optional(),
+          description: z.string().optional(),
+          value: z.string().optional(),
+          dueDate: z.string(),
+          billingType: z.enum(["PIX", "BOLETO"]),
+        })
+      )
+      .mutation(({ ctx, input }) => asaas.createAsaasCharge(ctx.user.id, input)),
+    resend: protectedProcedure
+      .input(z.object({ chargeId: z.number() }))
+      .mutation(({ ctx, input }) => asaas.resendAsaasCharge(ctx.user.id, input.chargeId)),
+    syncOne: protectedProcedure
+      .input(z.object({ asaasChargeId: z.string().min(1) }))
+      .mutation(({ ctx, input }) => asaas.syncAsaasChargeByExternalId(ctx.user.id, input.asaasChargeId)),
+    cancel: protectedProcedure
+      .input(z.object({ chargeId: z.number() }))
+      .mutation(({ ctx, input }) => asaas.cancelAsaasCharge(ctx.user.id, input.chargeId)),
+  }),
+
+  asaasSubscriptions: router({
+    list: protectedProcedure.query(({ ctx }) => asaas.listAsaasSubscriptions(ctx.user.id)),
+    create: protectedProcedure
+      .input(
+        z.object({
+          clientId: z.number(),
+          serviceId: z.number().optional(),
+          description: z.string().optional(),
+          value: z.string().optional(),
+          nextDueDate: z.string(),
+          billingType: z.enum(["PIX", "BOLETO"]),
+          cycle: z.enum(["WEEKLY", "BIWEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUALLY", "YEARLY"]),
+        })
+      )
+      .mutation(({ ctx, input }) => asaas.createAsaasSubscription(ctx.user.id, input)),
+    cancel: protectedProcedure
+      .input(z.object({ subscriptionId: z.number() }))
+      .mutation(({ ctx, input }) => asaas.cancelAsaasSubscription(ctx.user.id, input.subscriptionId)),
+  }),
+
+  asaasInvoices: router({
+    list: protectedProcedure.query(({ ctx }) => asaas.listAsaasInvoices(ctx.user.id)),
+    issue: protectedProcedure
+      .input(
+        z.object({
+          chargeId: z.number().optional(),
+          revenueId: z.number().optional(),
+          serviceDescription: z.string().min(1),
+          value: z.string(),
+          effectiveDate: z.string().optional(),
+          observations: z.string().optional(),
+          municipalServiceId: z.string().optional(),
+          municipalServiceCode: z.string().optional(),
+          municipalServiceName: z.string().optional(),
+          deductions: z.string().optional(),
+          retainIss: z.boolean().optional(),
+          iss: z.string().optional(),
+          cofins: z.string().optional(),
+          csll: z.string().optional(),
+          inss: z.string().optional(),
+          ir: z.string().optional(),
+          pis: z.string().optional(),
+        })
+      )
+      .mutation(({ ctx, input }) => asaas.issueAsaasInvoice(ctx.user.id, input)),
+    resend: protectedProcedure
+      .input(z.object({ invoiceId: z.number() }))
+      .mutation(({ ctx, input }) => asaas.resendAsaasInvoice(ctx.user.id, input.invoiceId)),
+  }),
+
+  asaasEvents: router({
+    list: protectedProcedure.query(({ ctx }) => asaas.listAsaasEvents(ctx.user.id)),
+    reprocess: protectedProcedure
+      .input(z.object({ eventId: z.number() }))
+      .mutation(({ ctx, input }) => asaas.reprocessAsaasEvent(ctx.user.id, input.eventId)),
   }),
 
   // ==================== DASHBOARDS ====================

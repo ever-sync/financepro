@@ -1,14 +1,16 @@
-import { pgTable, pgEnum, serial, varchar, text, timestamp, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, serial, varchar, text, timestamp, integer, numeric, boolean } from "drizzle-orm/pg-core";
 
 // ==================== ENUMS ====================
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
-export const revenueStatusEnum = pgEnum("revenue_status", ["pendente", "recebido", "atrasado"]);
+export const revenueStatusEnum = pgEnum("revenue_status", ["pendente", "recebido", "atrasado", "cancelado"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pago", "pendente", "atrasado"]);
 export const employeeStatusEnum = pgEnum("employee_status", ["ativo", "inativo"]);
 export const contractTypeEnum = pgEnum("contract_type", ["clt", "pj"]);
 export const debtStatusEnum = pgEnum("debt_status", ["ativa", "atrasada", "quitada", "renegociada"]);
 export const debtPriorityEnum = pgEnum("debt_priority", ["alta", "media", "baixa"]);
 export const fundTypeEnum = pgEnum("fund_type", ["empresa", "pessoal"]);
+export const asaasEnvironmentEnum = pgEnum("asaas_environment", ["sandbox", "production"]);
+export const asaasSyncStatusEnum = pgEnum("asaas_sync_status", ["pendente", "sincronizado", "erro"]);
 
 // ==================== USERS ====================
 export const users = pgTable("users", {
@@ -58,6 +60,14 @@ export const revenues = pgTable("revenues", {
   receivedDate: varchar("receivedDate", { length: 10 }),
   status: revenueStatusEnum("status").default("pendente").notNull(),
   seriesId: varchar("seriesId", { length: 64 }),
+  asaasPaymentId: varchar("asaasPaymentId", { length: 64 }),
+  asaasSubscriptionId: varchar("asaasSubscriptionId", { length: 64 }),
+  asaasBillingType: varchar("asaasBillingType", { length: 30 }),
+  asaasInvoiceUrl: varchar("asaasInvoiceUrl", { length: 500 }),
+  asaasBankSlipUrl: varchar("asaasBankSlipUrl", { length: 500 }),
+  asaasLastEvent: varchar("asaasLastEvent", { length: 120 }),
+  asaasExternalReference: varchar("asaasExternalReference", { length: 120 }),
+  asaasSyncedAt: timestamp("asaasSyncedAt"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
@@ -260,6 +270,10 @@ export const clients = pgTable("clients", {
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 320 }),
   address: varchar("address", { length: 500 }),
+  asaasCustomerId: varchar("asaasCustomerId", { length: 64 }),
+  asaasSyncStatus: asaasSyncStatusEnum("asaasSyncStatus").default("pendente").notNull(),
+  asaasLastSyncError: text("asaasLastSyncError"),
+  asaasLastSyncedAt: timestamp("asaasLastSyncedAt"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
@@ -286,6 +300,136 @@ export const services = pgTable("services", {
 
 export type Service = typeof services.$inferSelect;
 export type InsertService = typeof services.$inferInsert;
+
+// ==================== ASAAS ACCOUNT ====================
+export const asaasAccounts = pgTable("asaas_accounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  scopeKey: varchar("scopeKey", { length: 100 }).default("default").notNull(),
+  accountName: varchar("accountName", { length: 255 }).default("Conta principal").notNull(),
+  environment: asaasEnvironmentEnum("environment").default("sandbox").notNull(),
+  apiKey: text("apiKey").notNull(),
+  apiBaseUrl: varchar("apiBaseUrl", { length: 255 }),
+  webhookAuthToken: varchar("webhookAuthToken", { length: 255 }),
+  webhookUrl: varchar("webhookUrl", { length: 500 }),
+  enabled: boolean("enabled").default(true).notNull(),
+  lastConnectionStatus: varchar("lastConnectionStatus", { length: 40 }).default("pendente").notNull(),
+  lastConnectionMessage: text("lastConnectionMessage"),
+  lastConnectionCheckedAt: timestamp("lastConnectionCheckedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasAccount = typeof asaasAccounts.$inferSelect;
+export type InsertAsaasAccount = typeof asaasAccounts.$inferInsert;
+
+// ==================== ASAAS CHARGES ====================
+export const asaasCharges = pgTable("asaas_charges", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  accountId: integer("accountId").notNull(),
+  clientId: integer("clientId"),
+  serviceId: integer("serviceId"),
+  revenueId: integer("revenueId"),
+  asaasChargeId: varchar("asaasChargeId", { length: 64 }).notNull(),
+  asaasCustomerId: varchar("asaasCustomerId", { length: 64 }).notNull(),
+  asaasSubscriptionId: varchar("asaasSubscriptionId", { length: 64 }),
+  status: varchar("status", { length: 60 }).default("PENDING").notNull(),
+  billingType: varchar("billingType", { length: 30 }).notNull(),
+  description: varchar("description", { length: 500 }).notNull(),
+  value: numeric("value", { precision: 12, scale: 2 }).notNull(),
+  dueDate: varchar("dueDate", { length: 10 }).notNull(),
+  externalReference: varchar("externalReference", { length: 120 }),
+  invoiceUrl: varchar("invoiceUrl", { length: 500 }),
+  bankSlipUrl: varchar("bankSlipUrl", { length: 500 }),
+  pixQrCodeUrl: varchar("pixQrCodeUrl", { length: 500 }),
+  pixCopyAndPaste: text("pixCopyAndPaste"),
+  lastEvent: varchar("lastEvent", { length: 120 }),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  deletedAt: timestamp("deletedAt"),
+  rawPayload: text("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasCharge = typeof asaasCharges.$inferSelect;
+export type InsertAsaasCharge = typeof asaasCharges.$inferInsert;
+
+// ==================== ASAAS SUBSCRIPTIONS ====================
+export const asaasSubscriptions = pgTable("asaas_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  accountId: integer("accountId").notNull(),
+  clientId: integer("clientId"),
+  serviceId: integer("serviceId"),
+  asaasSubscriptionId: varchar("asaasSubscriptionId", { length: 64 }).notNull(),
+  asaasCustomerId: varchar("asaasCustomerId", { length: 64 }).notNull(),
+  status: varchar("status", { length: 60 }).default("ACTIVE").notNull(),
+  billingType: varchar("billingType", { length: 30 }).notNull(),
+  cycle: varchar("cycle", { length: 30 }).notNull(),
+  description: varchar("description", { length: 500 }).notNull(),
+  value: numeric("value", { precision: 12, scale: 2 }).notNull(),
+  nextDueDate: varchar("nextDueDate", { length: 10 }).notNull(),
+  externalReference: varchar("externalReference", { length: 120 }),
+  deletedAt: timestamp("deletedAt"),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  rawPayload: text("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasSubscription = typeof asaasSubscriptions.$inferSelect;
+export type InsertAsaasSubscription = typeof asaasSubscriptions.$inferInsert;
+
+// ==================== ASAAS INVOICES ====================
+export const asaasInvoices = pgTable("asaas_invoices", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  accountId: integer("accountId").notNull(),
+  chargeId: integer("chargeId"),
+  revenueId: integer("revenueId"),
+  asaasChargeId: varchar("asaasChargeId", { length: 64 }),
+  asaasInvoiceId: varchar("asaasInvoiceId", { length: 64 }).notNull(),
+  status: varchar("status", { length: 60 }).default("SCHEDULED").notNull(),
+  value: numeric("value", { precision: 12, scale: 2 }),
+  effectiveDate: varchar("effectiveDate", { length: 10 }),
+  invoiceNumber: varchar("invoiceNumber", { length: 80 }),
+  serviceDescription: text("serviceDescription"),
+  pdfUrl: varchar("pdfUrl", { length: 500 }),
+  xmlUrl: varchar("xmlUrl", { length: 500 }),
+  validationCode: varchar("validationCode", { length: 120 }),
+  lastError: text("lastError"),
+  authorizedAt: timestamp("authorizedAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  rawPayload: text("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasInvoice = typeof asaasInvoices.$inferSelect;
+export type InsertAsaasInvoice = typeof asaasInvoices.$inferInsert;
+
+// ==================== ASAAS WEBHOOK EVENTS ====================
+export const asaasWebhookEvents = pgTable("asaas_webhook_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
+  accountId: integer("accountId"),
+  eventFingerprint: varchar("eventFingerprint", { length: 255 }).notNull(),
+  eventType: varchar("eventType", { length: 120 }).notNull(),
+  resourceType: varchar("resourceType", { length: 60 }),
+  resourceId: varchar("resourceId", { length: 64 }),
+  duplicate: boolean("duplicate").default(false).notNull(),
+  processed: boolean("processed").default(false).notNull(),
+  lastError: text("lastError"),
+  payload: text("payload").notNull(),
+  processedAt: timestamp("processedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasWebhookEvent = typeof asaasWebhookEvents.$inferSelect;
+export type InsertAsaasWebhookEvent = typeof asaasWebhookEvents.$inferInsert;
 
 // ==================== FUNDO DE RESERVA ====================
 export const reserveFunds = pgTable("reserve_funds", {

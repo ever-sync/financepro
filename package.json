@@ -5,10 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && npm run build:server && npm run build:trpc-vercel",
+    "build": "vite build && npm run build:server && npm run build:trpc-vercel && npm run build:asaas-webhook",
     "build:server": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build:trpc-vercel": "esbuild server/_core/trpc-vercel.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/trpc-vercel.js",
-    "build:vercel": "vite build && npm run build:trpc-vercel",
+    "build:asaas-webhook": "esbuild server/_core/asaas-webhook-vercel.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/asaas-webhook.js",
+    "build:vercel": "vite build && npm run build:trpc-vercel && npm run build:asaas-webhook",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",

@@ -4,7 +4,7 @@ let bundledAppPromise: Promise<{ default: (req: Request, res: Response) => unkno
 
 function loadBundledApp() {
   // @ts-expect-error build artifact is generated before the serverless handler runs
-  bundledAppPromise ??= import("../../dist/trpc-vercel.js");
+  bundledAppPromise ??= import("../../dist/asaas-webhook.js");
   return bundledAppPromise;
 }
 

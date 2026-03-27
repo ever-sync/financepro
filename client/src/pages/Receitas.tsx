@@ -152,7 +152,7 @@ export default function Receitas() {
   };
 
   const toggleStatus = (item: typeof items[0]) => {
-    const next = item.status === "recebido" ? "pendente" : "recebido";
+    const next = item.status === "recebido" ? "pendente" : item.status === "cancelado" ? "pendente" : "recebido";
     updateMutation.mutate({ id: item.id, status: next, receivedDate: next === "recebido" ? new Date().toISOString().split("T")[0] : null });
   };
 
@@ -248,6 +248,7 @@ export default function Receitas() {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="recebido">Recebido</SelectItem>
                       <SelectItem value="atrasado">Atrasado</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

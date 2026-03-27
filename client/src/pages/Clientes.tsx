@@ -3,9 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Pencil, Search, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Pencil, Search, Loader2, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -69,6 +70,13 @@ export default function Clientes() {
   const createClient = trpc.clients.create.useMutation({ onSuccess: () => { utils.clients.list.invalidate(); toast.success("Cliente adicionado"); closeDialog(); } });
   const updateClient = trpc.clients.update.useMutation({ onSuccess: () => { utils.clients.list.invalidate(); toast.success("Cliente atualizado"); closeDialog(); } });
   const deleteClient = trpc.clients.delete.useMutation({ onSuccess: () => { utils.clients.list.invalidate(); toast.success("Removido"); } });
+  const syncClient = trpc.asaasCustomers.syncOne.useMutation({
+    onSuccess: () => {
+      utils.clients.list.invalidate();
+      toast.success("Cliente sincronizado com o Asaas.");
+    },
+    onError: error => toast.error(error.message),
+  });
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -272,14 +280,15 @@ export default function Clientes() {
                 <TableHead>Contato</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>E-mail</TableHead>
-                <TableHead className="w-[90px]"></TableHead>
+                <TableHead>Asaas</TableHead>
+                <TableHead className="w-[140px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
               ) : clients.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum cliente cadastrado</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente cadastrado</TableCell></TableRow>
               ) : clients.map(item => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.name}</TableCell>
@@ -289,7 +298,18 @@ export default function Clientes() {
                   <TableCell>{item.phone || "-"}</TableCell>
                   <TableCell>{item.email || "-"}</TableCell>
                   <TableCell>
+                    <div className="space-y-1">
+                      <StatusBadge status={item.asaasSyncStatus || "pendente"} />
+                      {item.asaasCustomerId ? (
+                        <p className="text-xs text-muted-foreground">{item.asaasCustomerId}</p>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncClient.mutate({ clientId: item.id })}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteClient.mutate({ id: item.id })}><Trash2 className="h-4 w-4" /></Button>
                     </div>

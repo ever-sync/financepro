@@ -64,6 +64,13 @@
       "when": 1773973424868,
       "tag": "0009_nice_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774648800000,
+      "tag": "0010_asaas_billing",
+      "breakpoints": true
     }
   ]
 }

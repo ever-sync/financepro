@@ -24,6 +24,11 @@ const FundoReserva = lazy(() => import("./pages/FundoReserva"));
 const DRE = lazy(() => import("./pages/DRE"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const AsaasIntegracao = lazy(() => import("./pages/AsaasIntegracao"));
+const AsaasCobrancas = lazy(() => import("./pages/AsaasCobrancas"));
+const AsaasAssinaturas = lazy(() => import("./pages/AsaasAssinaturas"));
+const AsaasNotas = lazy(() => import("./pages/AsaasNotas"));
+const AsaasEventos = lazy(() => import("./pages/AsaasEventos"));
 
 function RouteFallback() {
   return (
@@ -58,6 +63,11 @@ function Router() {
           <Route path="/dre" component={DRE} />
           <Route path="/calendario" component={Calendario} />
           <Route path="/configuracoes" component={Configuracoes} />
+          <Route path="/asaas/integracao" component={AsaasIntegracao} />
+          <Route path="/asaas/cobrancas" component={AsaasCobrancas} />
+          <Route path="/asaas/assinaturas" component={AsaasAssinaturas} />
+          <Route path="/asaas/notas" component={AsaasNotas} />
+          <Route path="/asaas/eventos" component={AsaasEventos} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

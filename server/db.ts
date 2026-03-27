@@ -981,7 +981,9 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
 
   const summarizeMonth = (targetMonth: number, targetYear: number, label: string) => {
     const targetSerial = monthSerial(targetYear, targetMonth);
-    const monthRevenueRows = revenueRows.filter(row => isSameMonthYear(row.dueDate, targetMonth, targetYear));
+    const monthRevenueRows = revenueRows.filter(
+      row => isSameMonthYear(row.dueDate, targetMonth, targetYear) && row.status !== "cancelado"
+    );
     const monthFixedRows = allFixedCosts.filter(row => row.month === targetMonth && row.year === targetYear);
     const monthVariableRows = variableCostRows.filter(row => isSameMonthYear(row.date, targetMonth, targetYear));
     const monthPurchaseRows = purchaseRows.filter(row => isSameMonthYear(row.dueDate, targetMonth, targetYear));
@@ -1051,7 +1053,9 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
   const currentSnapshot = monthlySnapshots[monthlySnapshots.length - 1];
   const previousSnapshot = monthlySnapshots[monthlySnapshots.length - 2] ?? currentSnapshot;
 
-  const currentRevenueRows = revenueRows.filter(row => isSameMonthYear(row.dueDate, month, year));
+  const currentRevenueRows = revenueRows.filter(
+    row => isSameMonthYear(row.dueDate, month, year) && row.status !== "cancelado"
+  );
   const currentVariableRows = variableCostRows.filter(row => isSameMonthYear(row.date, month, year));
   const currentPurchaseRows = purchaseRows.filter(row => isSameMonthYear(row.dueDate, month, year));
   const currentReserveRows = reserveRows.filter(row => isSameMonthYear(row.date, month, year));

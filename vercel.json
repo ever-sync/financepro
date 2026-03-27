@@ -7,6 +7,10 @@
     "api/trpc/[trpc].ts": {
       "maxDuration": 30,
       "includeFiles": "dist/trpc-vercel.js"
+    },
+    "api/asaas/webhook.ts": {
+      "maxDuration": 30,
+      "includeFiles": "dist/asaas-webhook.js"
     }
   },
   "rewrites": [
