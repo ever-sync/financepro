@@ -1,5 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 
@@ -9,11 +9,34 @@ export type TrpcContext = {
   user: User | null;
 };
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL ?? "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY ?? "";
+const supabaseUrl =
+  process.env.SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  process.env.VITE_SUPABASE_URL ??
+  "";
+const supabaseServiceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.VITE_SUPABASE_ANON_KEY ??
+  "";
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+let supabaseAdmin: SupabaseClient | null = null;
+
+function getSupabaseAdmin() {
+  if (supabaseAdmin) return supabaseAdmin;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+
+  try {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    return supabaseAdmin;
+  } catch (error) {
+    console.error("[Auth] Failed to initialize Supabase client:", error);
+    return null;
+  }
+}
 const AUTH_CACHE_TTL_MS = 30_000;
 const authCache = new Map<string, { expiresAt: number; user: User }>();
 const pendingAuthLookups = new Map<string, Promise<User | null>>();
@@ -36,6 +59,12 @@ async function migrateExistingUserIfNeeded(supabaseOpenId: string): Promise<void
 }
 
 async function resolveAppUserFromToken(token: string): Promise<User | null> {
+  const client = getSupabaseAdmin();
+  if (!client) {
+    console.warn("[Auth] Supabase client is not configured in runtime environment");
+    return null;
+  }
+
   const cached = authCache.get(token);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.user;
@@ -50,7 +79,7 @@ async function resolveAppUserFromToken(token: string): Promise<User | null> {
     const {
       data: { user: supaAuthUser },
       error,
-    } = await supabaseAdmin.auth.getUser(token);
+    } = await client.auth.getUser(token);
 
     if (error || !supaAuthUser) return null;
 
