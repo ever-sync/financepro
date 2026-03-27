@@ -241,8 +241,15 @@ export const appRouter = router({
   // ==================== SUPPLIER PURCHASES ====================
   supplierPurchases: router({
     list: protectedProcedure
-      .input(z.object({ month: z.number().optional(), year: z.number().optional() }))
-      .query(({ ctx, input }) => db.getSupplierPurchases(ctx.user.id, input.month, input.year)),
+      .input(z.object({ 
+        month: z.number().optional(), 
+        year: z.number().optional(),
+        page: z.number().optional().default(1),
+        limit: z.number().optional().default(50),
+        orderBy: z.string().optional().default("dueDate"),
+        orderDirection: z.enum(["asc", "desc"]).optional().default("asc")
+      }))
+      .query(({ ctx, input }) => db.getSupplierPurchases(ctx.user.id, input)),
     create: protectedProcedure
       .input(z.object({
         supplierId: z.number(),
@@ -538,6 +545,31 @@ export const appRouter = router({
     data: protectedProcedure
       .input(z.object({ month: z.number(), year: z.number() }))
       .query(({ ctx, input }) => db.getCalendarData(ctx.user.id, input.month, input.year)),
+  }),
+
+  // ==================== FINANCIAL ANALYSIS (IA) ====================
+  financialAnalysis: router({
+    analyze: protectedProcedure
+      .input(z.object({ 
+        month: z.number().optional(), 
+        year: z.number().optional() 
+      }))
+      .query(async ({ ctx, input }) => {
+        const { analyzeFinancialData } = await import("./db/repositories/financial-analysis");
+        return analyzeFinancialData(ctx.user.id, input.month, input.year);
+      }),
+    
+    sendWhatsApp: protectedProcedure
+      .input(z.object({ 
+        phoneNumber: z.string().min(10),
+        month: z.number().optional(), 
+        year: z.number().optional() 
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { analyzeFinancialData, sendFinancialAlertToWhatsApp } = await import("./db/repositories/financial-analysis");
+        const analysis = await analyzeFinancialData(ctx.user.id, input.month, input.year);
+        return sendFinancialAlertToWhatsApp(ctx.user.id, input.phoneNumber, analysis);
+      }),
   }),
 });
 
