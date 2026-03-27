@@ -1,6 +1,5 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { trpc } from "@/lib/trpc";
 import {
   Sidebar,
   SidebarContent,
@@ -19,10 +18,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useSupabaseAuth } from "@/lib/auth";
-import { useIsMobile } from "@/hooks/useMobile";
+import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/useMobile";
 import { useTranslation } from "react-i18next";
 import {
+  AlertCircle,
+  Briefcase,
   Building2,
   CalendarDays,
   ChevronsLeft,
@@ -30,23 +32,21 @@ import {
   DollarSign,
   FileText,
   LayoutDashboard,
+  Loader2,
   LogOut,
+  PiggyBank,
   Receipt,
   Settings,
   TrendingDown,
   TrendingUp,
   Truck,
   User,
+  UserCheck,
   Users,
   Wallet,
   type LucideIcon,
-  PiggyBank,
-  Briefcase,
-  UserCheck,
-  AlertCircle,
-  Loader2,
 } from "lucide-react";
-import { CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import AuthPage from "@/pages/Auth";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -65,6 +65,7 @@ type SidebarSection = {
 
 const SIDEBAR_STYLE = {
   "--sidebar-width": "17.5rem",
+  "--sidebar-width-mobile": "min(86vw, 20rem)",
   "--sidebar-width-icon": "3.75rem",
   "--sidebar": "oklch(0.985 0.003 260)",
   "--sidebar-foreground": "oklch(0.32 0.01 260)",
@@ -79,45 +80,53 @@ const SIDEBAR_STYLE = {
 const useSidebarSections = () => {
   const { t } = useTranslation();
 
-  return useMemo(() => [
-    {
-      label: t('navigation.dashboard'),
-      items: [
-        { icon: LayoutDashboard, label: t('dashboard.title'), path: "/" },
-        { icon: User, label: t('navigation.profile'), path: "/pessoal" },
-      ],
-    },
-    {
-      label: "Empresa",
-      items: [
-        { icon: DollarSign, label: t('navigation.revenues'), path: "/receitas" },
-        { icon: Building2, label: t('costs.fixedCosts'), path: "/custos-fixos" },
-        { icon: Receipt, label: t('costs.variableCosts'), path: "/custos-variaveis" },
-        { icon: Users, label: t('navigation.employees'), path: "/funcionarios" },
-        { icon: Truck, label: t('navigation.suppliers'), path: "/fornecedores" },
-        { icon: UserCheck, label: t('navigation.clients'), path: "/clientes" },
-        { icon: Briefcase, label: t('navigation.services'), path: "/servicos" },
-      ],
-    },
-    {
-      label: "Pessoal",
-      items: [
-        { icon: Wallet, label: t('costs.fixedCosts'), path: "/contas-fixas" },
-        { icon: Receipt, label: t('costs.variableCosts'), path: "/contas-variaveis" },
-        { icon: TrendingDown, label: t('navigation.debts'), path: "/dividas" },
-        { icon: TrendingUp, label: t('navigation.investments'), path: "/investimentos" },
-        { icon: PiggyBank, label: t('dashboard.reservedFund'), path: "/fundo-reserva" },
-      ],
-    },
-    {
-      label: t('navigation.tools') || "Ferramentas",
-      items: [
-        { icon: FileText, label: "DRE", path: "/dre" },
-        { icon: CalendarDays, label: t('navigation.calendar') || "Calendário", path: "/calendario" },
-        { icon: Settings, label: t('navigation.settings'), path: "/configuracoes" },
-      ],
-    },
-  ], [t]);
+  const getLabel = (key: string, fallback: string) => {
+    const translated = t(key, { defaultValue: fallback });
+    return translated === key ? fallback : translated;
+  };
+
+  return useMemo(
+    () => [
+      {
+        label: getLabel("navigation.dashboard", "Dashboard"),
+        items: [
+          { icon: LayoutDashboard, label: getLabel("dashboard.title", "Visao geral"), path: "/" },
+          { icon: User, label: getLabel("navigation.profile", "Perfil"), path: "/pessoal" },
+        ],
+      },
+      {
+        label: "Empresa",
+        items: [
+          { icon: DollarSign, label: getLabel("navigation.revenues", "Receitas"), path: "/receitas" },
+          { icon: Building2, label: getLabel("costs.fixedCosts", "Custos fixos"), path: "/custos-fixos" },
+          { icon: Receipt, label: getLabel("costs.variableCosts", "Custos variaveis"), path: "/custos-variaveis" },
+          { icon: Users, label: getLabel("navigation.employees", "Funcionarios"), path: "/funcionarios" },
+          { icon: Truck, label: getLabel("navigation.suppliers", "Fornecedores"), path: "/fornecedores" },
+          { icon: UserCheck, label: getLabel("navigation.clients", "Clientes"), path: "/clientes" },
+          { icon: Briefcase, label: getLabel("navigation.services", "Servicos"), path: "/servicos" },
+        ],
+      },
+      {
+        label: "Pessoal",
+        items: [
+          { icon: Wallet, label: getLabel("costs.fixedCosts", "Custos fixos"), path: "/contas-fixas" },
+          { icon: Receipt, label: getLabel("costs.variableCosts", "Custos variaveis"), path: "/contas-variaveis" },
+          { icon: TrendingDown, label: getLabel("navigation.debts", "Dividas"), path: "/dividas" },
+          { icon: TrendingUp, label: getLabel("navigation.investments", "Investimentos"), path: "/investimentos" },
+          { icon: PiggyBank, label: getLabel("dashboard.reservedFund", "Fundo de reserva"), path: "/fundo-reserva" },
+        ],
+      },
+      {
+        label: getLabel("navigation.tools", "Ferramentas"),
+        items: [
+          { icon: FileText, label: "DRE", path: "/dre" },
+          { icon: CalendarDays, label: getLabel("navigation.calendar", "Calendario"), path: "/calendario" },
+          { icon: Settings, label: getLabel("navigation.settings", "Configuracoes"), path: "/configuracoes" },
+        ],
+      },
+    ],
+    [t]
+  );
 };
 
 function getInitialSidebarOpen() {
@@ -153,10 +162,7 @@ export default function DashboardLayout({
   if (appUserQuery.error || !appUserQuery.data) {
     if (appUserQuery.isLoading) {
       return (
-        <SidebarProvider
-          defaultOpen={sidebarDefaultOpen}
-          style={SIDEBAR_STYLE}
-        >
+        <SidebarProvider defaultOpen={sidebarDefaultOpen} style={SIDEBAR_STYLE}>
           <DashboardLayoutContent>{children}</DashboardLayoutContent>
         </SidebarProvider>
       );
@@ -169,11 +175,12 @@ export default function DashboardLayout({
             <AlertCircle className="size-7" />
           </div>
           <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-900">
-            Sessão sem sincronização
+            Sessao sem sincronizacao
           </h1>
           <p className="mt-2 text-sm leading-6 text-zinc-500">
-            Seu login existe no navegador, mas o servidor não conseguiu validar o usuário da aplicação.
-            Enquanto isso acontecer, os dados protegidos podem aparecer vazios no front-end.
+            Seu login existe no navegador, mas o servidor nao conseguiu validar o usuario da
+            aplicacao. Enquanto isso acontecer, os dados protegidos podem aparecer vazios no
+            front-end.
           </p>
           {appUserQuery.error ? (
             <p className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -210,10 +217,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider
-      defaultOpen={sidebarDefaultOpen}
-      style={SIDEBAR_STYLE}
-    >
+    <SidebarProvider defaultOpen={sidebarDefaultOpen} style={SIDEBAR_STYLE}>
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </SidebarProvider>
   );
@@ -237,7 +241,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         location={location}
         onNavigate={setLocation}
         onLogout={signOut}
-        userName={user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "Usuário"}
+        userName={user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "Usuario"}
         userEmail={user?.email ?? ""}
       />
 
@@ -246,13 +250,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <span className="text-sm font-medium tracking-tight text-foreground">
+              <span className="max-w-[60vw] truncate text-sm font-medium tracking-tight text-foreground">
                 {activeMenuItem?.label ?? "Menu"}
               </span>
             </div>
           </div>
         )}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 text-zinc-900">{children}</main>
+        <main className="flex-1 p-4 text-zinc-900 md:p-6 lg:p-8">{children}</main>
       </SidebarInset>
     </>
   );
@@ -283,12 +287,8 @@ function DashboardSidebar({
     .join("") || "U";
 
   return (
-    <Sidebar
-      collapsible="icon"
-      variant="floating"
-      className="border-0 bg-transparent"
-    >
-      <SidebarHeader className="px-3 pt-3 pb-2">
+    <Sidebar collapsible="icon" variant="floating" className="border-0 bg-transparent">
+      <SidebarHeader className="px-3 pb-2 pt-3">
         <div
           className={cn(
             "flex items-center justify-between gap-3 rounded-[24px] border border-zinc-200 bg-white px-3 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition-all",
@@ -302,9 +302,7 @@ function DashboardSidebar({
             <p className="truncate text-sm font-semibold tracking-tight text-zinc-900">
               FinancePro
             </p>
-            <p className="truncate text-[11px] text-zinc-500">
-              Dashboard financeiro
-            </p>
+            <p className="truncate text-[11px] text-zinc-500">Dashboard financeiro</p>
           </div>
           <Button
             type="button"
@@ -326,8 +324,8 @@ function DashboardSidebar({
 
       <SidebarContent className="px-2 pb-2">
         {sections.map(section => (
-          <SidebarGroup key={section.label} className="px-0 py-2">
-            <SidebarGroupLabel className="px-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-400 group-data-[collapsible=icon]:hidden">
+          <SidebarGroup key={section.label} className="px-0 py-1.5">
+            <SidebarGroupLabel className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 group-data-[collapsible=icon]:hidden">
               {section.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -347,7 +345,7 @@ function DashboardSidebar({
                           }
                         }}
                         className={cn(
-                          "h-10 rounded-full px-3.5 text-sm font-medium text-zinc-500 transition-all",
+                          "h-10 rounded-full px-3.5 text-[13px] font-medium leading-none text-zinc-500 transition-all sm:text-sm",
                           "hover:bg-zinc-100 hover:text-zinc-900",
                           "data-[active=true]:bg-zinc-900 data-[active=true]:text-white data-[active=true]:shadow-[0_14px_32px_rgba(15,23,42,0.18)]",
                           "group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
@@ -381,28 +379,31 @@ function DashboardSidebar({
         >
           <div
             className={cn(
-              "flex items-center gap-3",
-              "group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2"
+              "flex flex-col gap-3",
+              "group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2"
             )}
           >
-            <Avatar className="size-9 border border-zinc-200 group-data-[collapsible=icon]:hidden">
-              <AvatarFallback className="bg-zinc-100 text-xs font-semibold text-zinc-700">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <div
+              className={cn(
+                "flex items-center gap-3",
+                "group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center"
+              )}
+            >
+              <Avatar className="size-9 border border-zinc-200 group-data-[collapsible=icon]:hidden">
+                <AvatarFallback className="bg-zinc-100 text-xs font-semibold text-zinc-700">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
 
-            <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-              <p className="truncate text-sm font-medium text-zinc-900">
-                {userName}
-              </p>
-              <p className="truncate text-[11px] text-zinc-500">
-                {userEmail || " "}
-              </p>
+              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <p className="truncate text-sm font-medium text-zinc-900">{userName}</p>
+                <p className="truncate text-[11px] text-zinc-500">{userEmail || " "}</p>
+              </div>
             </div>
 
             <div
               className={cn(
-                "flex items-center gap-1",
+                "flex items-center gap-2",
                 "group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2"
               )}
             >
@@ -416,13 +417,15 @@ function DashboardSidebar({
                     toggleSidebar();
                   }
                 }}
-                className="size-8 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
-                aria-label="Abrir configurações"
-                title="Configurações"
+                className="size-8 shrink-0 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+                aria-label="Abrir configuracoes"
+                title="Configuracoes"
               >
                 <Settings className="size-4" />
               </Button>
-              <LanguageSwitcher />
+
+              <LanguageSwitcher className="min-w-0 flex-1 group-data-[collapsible=icon]:w-full" />
+
               <Button
                 type="button"
                 variant="ghost"
@@ -433,7 +436,7 @@ function DashboardSidebar({
                     toggleSidebar();
                   }
                 }}
-                className="size-8 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+                className="size-8 shrink-0 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
                 aria-label="Sair da conta"
                 title="Sair"
               >
