@@ -1,0 +1,1 @@
+function r(t){return(typeof t=="string"?parseFloat(t):t??0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}function o(t){return`${(typeof t=="string"?parseFloat(t):t??0).toFixed(1)}%`}function e(t){if(!t)return"-";const n=t.split("-");return n.length===3?`${n[2]}/${n[1]}/${n[0]}`:t}export{o as a,e as b,r as f};

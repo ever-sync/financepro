@@ -123,6 +123,15 @@ function buildRollingMonths(month: number, year: number, count = 8) {
   });
 }
 
+function buildYearMonths(year: number) {
+  return Array.from({ length: 12 }, (_, index) => ({
+    year,
+    month: index + 1,
+    key: monthKey(year, index + 1),
+    label: DASHBOARD_MONTH_LABELS[index] ?? `M${index + 1}`,
+  }));
+}
+
 function isSameMonthYear(value: string | null | undefined, month: number, year: number) {
   const parts = parseDateParts(value);
   return parts ? parts.month === month && parts.year === year : false;
@@ -970,7 +979,7 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
       };
     });
 
-  const monthlySnapshots = buildRollingMonths(month, year, 8).map(({ year: targetYear, month: targetMonth, label }) => {
+  const summarizeMonth = (targetMonth: number, targetYear: number, label: string) => {
     const targetSerial = monthSerial(targetYear, targetMonth);
     const monthRevenueRows = revenueRows.filter(row => isSameMonthYear(row.dueDate, targetMonth, targetYear));
     const monthFixedRows = allFixedCosts.filter(row => row.month === targetMonth && row.year === targetYear);
@@ -1009,7 +1018,35 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
       profit,
       balance,
     };
-  });
+  };
+
+  const monthlySnapshots = buildRollingMonths(month, year, 8).map(({ year: targetYear, month: targetMonth, label }) =>
+    summarizeMonth(targetMonth, targetYear, label)
+  );
+
+  const resultSeries = buildYearMonths(year).reduce<Array<{
+    key: string;
+    month: string;
+    monthlyResult: number;
+    previousAccumulatedResult: number;
+    accumulatedResult: number;
+    passiveCarryResult: number;
+  }>>((series, { year: targetYear, month: targetMonth, label, key }) => {
+    const snapshot = summarizeMonth(targetMonth, targetYear, label);
+    const previousAccumulated = series[series.length - 1]?.accumulatedResult ?? 0;
+    const accumulatedResult = previousAccumulated + snapshot.profit;
+
+    series.push({
+      key,
+      month: label,
+      monthlyResult: snapshot.profit,
+      previousAccumulatedResult: previousAccumulated,
+      accumulatedResult,
+      passiveCarryResult: previousAccumulated,
+    });
+
+    return series;
+  }, []);
 
   const currentSnapshot = monthlySnapshots[monthlySnapshots.length - 1];
   const previousSnapshot = monthlySnapshots[monthlySnapshots.length - 2] ?? currentSnapshot;
@@ -1035,6 +1072,12 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
   const currentSpending = currentFixedCostsTotal + currentVariableCostsTotal + currentEmployeeTotalCost + currentPurchaseTotal + proLabore;
   const currentProfit = currentRevenueNet - currentSpending;
   const currentBalance = currentProfit + currentReserveBalance;
+  const currentAccumulatedResult =
+    resultSeries.find(snapshot => snapshot.month === (DASHBOARD_MONTH_LABELS[month - 1] ?? `M${month}`))
+      ?.accumulatedResult ?? currentProfit;
+  const currentPassiveCarryResult =
+    resultSeries.find(snapshot => snapshot.month === (DASHBOARD_MONTH_LABELS[month - 1] ?? `M${month}`))
+      ?.passiveCarryResult ?? 0;
 
   const previousRevenueGross = previousSnapshot?.grossRevenue ?? 0;
   const previousRevenueTax = previousSnapshot?.taxAmount ?? 0;
@@ -1047,6 +1090,14 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
   const previousSpending = previousSnapshot?.spending ?? 0;
   const previousProfit = previousSnapshot?.profit ?? 0;
   const previousBalance = previousSnapshot?.balance ?? 0;
+  const previousAccumulatedResult =
+    month > 1
+      ? (resultSeries[month - 2]?.accumulatedResult ?? previousProfit)
+      : 0;
+  const previousPassiveCarryResult =
+    month > 1
+      ? (resultSeries[month - 2]?.passiveCarryResult ?? 0)
+      : 0;
 
   const walletBase: DashboardWallet[] = [
     {
@@ -1245,6 +1296,7 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
       total: currentReserveBalance.toFixed(2),
       count: currentReserveRows.length,
     },
+    resultSeries,
     wallets,
     activities: activities.slice(0, 6).map(({ sortKey, ...activity }) => activity),
     chartSeries,
@@ -1261,6 +1313,8 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
         spending: currentSpending,
         profit: currentProfit,
         balance: currentBalance,
+        accumulatedResult: currentAccumulatedResult,
+        passiveCarryResult: currentPassiveCarryResult,
       },
       previous: {
         grossRevenue: previousRevenueGross,
@@ -1274,6 +1328,8 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
         spending: previousSpending,
         profit: previousProfit,
         balance: previousBalance,
+        accumulatedResult: previousAccumulatedResult,
+        passiveCarryResult: previousPassiveCarryResult,
       },
     },
     settings: userSettings,

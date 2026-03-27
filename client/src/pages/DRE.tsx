@@ -22,6 +22,9 @@ export default function DRE() {
   const proLabore = parseFloat(settings?.proLaboreGross || "0");
   const netProfit = operatingProfit - proLabore;
   const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
+  const resultSeries = company?.resultSeries ?? [];
+  const annualAccumulatedResult =
+    resultSeries[resultSeries.length - 1]?.accumulatedResult ?? netProfit;
 
   const DRELine = ({ label, value, indent = 0, bold = false, highlight = false, negative = false }: {
     label: string; value: number; indent?: number; bold?: boolean; highlight?: boolean; negative?: boolean;
@@ -109,6 +112,54 @@ export default function DRE() {
               <p className="text-lg font-bold">{formatPercent(grossRevenue > 0 ? (employeeCosts / grossRevenue) * 100 : 0)}</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="text-base">Resultado do Exercício Acumulado - {year}</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="overflow-x-auto">
+            <div className="min-w-[980px] rounded-xl border border-border">
+              <div className="grid grid-cols-[220px_repeat(12,minmax(70px,1fr))_120px] items-center border-b bg-muted/30 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="px-4 py-3">Indicador</div>
+                {resultSeries.map(item => (
+                  <div key={`${item.key}-header`} className="px-2 py-3 text-center">
+                    {item.month}
+                  </div>
+                ))}
+                <div className="px-4 py-3 text-right">Total</div>
+              </div>
+
+              <div className="grid grid-cols-[220px_repeat(12,minmax(70px,1fr))_120px] items-center text-sm">
+                <div className="px-4 py-4 font-medium">Resultado do Exercício</div>
+                {resultSeries.map(item => (
+                  <div key={item.key} className="px-2 py-4 text-center font-mono">
+                    {formatCurrency(item.accumulatedResult)}
+                  </div>
+                ))}
+                <div className="px-4 py-4 text-right font-mono font-semibold">
+                  {formatCurrency(annualAccumulatedResult)}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[220px_repeat(12,minmax(70px,1fr))_120px] items-center border-t text-sm">
+                <div className="px-4 py-4 font-medium text-muted-foreground">Acumulado anterior no passivo</div>
+                {resultSeries.map(item => (
+                  <div key={`${item.key}-passive-carry`} className="px-2 py-4 text-center font-mono text-muted-foreground">
+                    {formatCurrency(item.passiveCarryResult ?? 0)}
+                  </div>
+                ))}
+                <div className="px-4 py-4 text-right font-mono text-muted-foreground">
+                  {formatCurrency(resultSeries[resultSeries.length - 1]?.passiveCarryResult ?? 0)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Janeiro mostra o resultado do mês. De fevereiro em diante, cada coluna acumula o resultado do mês anterior.
+          </p>
         </CardContent>
       </Card>
     </div>
