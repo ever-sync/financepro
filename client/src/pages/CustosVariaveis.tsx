@@ -21,9 +21,10 @@ const categories = ["Material", "Transporte", "Alimentacao", "Manutencao", "Comb
 export default function CustosVariaveis() {
   const { month, year, monthName, goToPrevMonth, goToNextMonth } = useMonthYear();
   const utils = trpc.useUtils();
-  const { data: items = [], isLoading } = trpc.companyVariableCosts.list.useQuery({ month, year });
+  const { data: items, isLoading } = trpc.companyVariableCosts.list.useQuery({ month, year });
   const [open, setOpen] = useState(false);
   const [installmentMode, setInstallmentMode] = useState(false);
+  const rows = Array.isArray(items) ? items : items?.data ?? [];
 
   const createMut = trpc.companyVariableCosts.create.useMutation({
     onSuccess: () => {
@@ -66,12 +67,12 @@ export default function CustosVariaveis() {
     });
   };
 
-  const toggleStatus = (item: typeof items[0]) => {
+  const toggleStatus = (item: (typeof rows)[number]) => {
     const next = item.status === "pago" ? "pendente" : "pago";
     updateMut.mutate({ id: item.id, status: next });
   };
 
-  const total = items.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+  const total = rows.reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -187,14 +188,14 @@ export default function CustosVariaveis() {
                     Carregando...
                   </TableCell>
                 </TableRow>
-              ) : items.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     Nenhum custo variavel neste mes
                   </TableCell>
                 </TableRow>
               ) : (
-                items.map((item) => (
+                rows.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
                       <div>{item.description}</div>

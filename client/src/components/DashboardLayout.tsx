@@ -347,14 +347,14 @@ function DashboardSidebar({
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2 pb-2">
+      <SidebarContent className="space-y-3 px-2 pb-3">
         {sections.map(section => (
-          <SidebarGroup key={section.label} className="px-0 py-1.5">
-            <SidebarGroupLabel className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 group-data-[collapsible=icon]:hidden">
+          <SidebarGroup key={section.label} className="px-0 py-0">
+            <SidebarGroupLabel className="mb-2 !h-auto px-3 py-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 group-data-[collapsible=icon]:hidden">
               {section.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
+              <SidebarMenu className="gap-2">
                 {section.items.map(item => {
                   const isActive = location === item.path;
 
@@ -370,7 +370,7 @@ function DashboardSidebar({
                           }
                         }}
                         className={cn(
-                          "h-10 rounded-full px-3.5 text-[13px] font-medium leading-none text-zinc-500 transition-all sm:text-sm",
+                          "h-10.5 rounded-full px-3.5 text-[13px] font-medium leading-none text-zinc-500 transition-all sm:h-11 sm:text-sm",
                           "hover:bg-zinc-100 hover:text-zinc-900",
                           "data-[active=true]:bg-zinc-900 data-[active=true]:text-white data-[active=true]:shadow-[0_14px_32px_rgba(15,23,42,0.18)]",
                           "group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
@@ -382,7 +382,7 @@ function DashboardSidebar({
                             isActive ? "text-white" : "text-zinc-500"
                           )}
                         />
-                        <span className="truncate group-data-[collapsible=icon]:hidden">
+                        <span className="truncate leading-none group-data-[collapsible=icon]:hidden">
                           {item.label}
                         </span>
                       </SidebarMenuButton>
