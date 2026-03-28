@@ -29,6 +29,11 @@ const AsaasCobrancas = lazy(() => import("./pages/AsaasCobrancas"));
 const AsaasAssinaturas = lazy(() => import("./pages/AsaasAssinaturas"));
 const AsaasNotas = lazy(() => import("./pages/AsaasNotas"));
 const AsaasEventos = lazy(() => import("./pages/AsaasEventos"));
+const WhatsAppIntegracao = lazy(() => import("./pages/WhatsAppIntegracao"));
+const WhatsAppConversas = lazy(() => import("./pages/WhatsAppConversas"));
+const WhatsAppAutomacao = lazy(() => import("./pages/WhatsAppAutomacao"));
+const WhatsAppPlanos = lazy(() => import("./pages/WhatsAppPlanos"));
+const WhatsAppAuditoria = lazy(() => import("./pages/WhatsAppAuditoria"));
 
 function RouteFallback() {
   return (
@@ -68,6 +73,11 @@ function Router() {
           <Route path="/asaas/assinaturas" component={AsaasAssinaturas} />
           <Route path="/asaas/notas" component={AsaasNotas} />
           <Route path="/asaas/eventos" component={AsaasEventos} />
+          <Route path="/whatsapp/integracao" component={WhatsAppIntegracao} />
+          <Route path="/whatsapp/conversas" component={WhatsAppConversas} />
+          <Route path="/whatsapp/automacao" component={WhatsAppAutomacao} />
+          <Route path="/whatsapp/planos" component={WhatsAppPlanos} />
+          <Route path="/whatsapp/auditoria" component={WhatsAppAuditoria} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

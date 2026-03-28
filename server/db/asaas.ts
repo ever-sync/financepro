@@ -51,9 +51,11 @@ export async function upsertAsaasAccount(
   if (existing) {
     const updatePayload = {
       ...data,
-      apiKey: data.apiKey || existing.apiKey,
+      apiKey: data.apiKey?.trim() ? data.apiKey : existing.apiKey,
       webhookAuthToken:
-        data.webhookAuthToken === undefined ? existing.webhookAuthToken : data.webhookAuthToken,
+        data.webhookAuthToken == null || data.webhookAuthToken === ""
+          ? existing.webhookAuthToken
+          : data.webhookAuthToken,
     };
     await db.update(asaasAccounts).set(updatePayload).where(eq(asaasAccounts.id, existing.id));
     return { ...existing, ...updatePayload };
@@ -66,7 +68,7 @@ export async function upsertAsaasAccount(
     environment: data.environment,
     apiKey: data.apiKey ?? "",
     apiBaseUrl: data.apiBaseUrl ?? null,
-    webhookAuthToken: data.webhookAuthToken ?? null,
+    webhookAuthToken: data.webhookAuthToken?.trim() ? data.webhookAuthToken : null,
     webhookUrl: data.webhookUrl ?? null,
     enabled: data.enabled ?? true,
     lastConnectionStatus: data.lastConnectionStatus ?? "pendente",
@@ -120,6 +122,17 @@ export async function listClientsForSync(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(clients).where(eq(clients.userId, userId)).orderBy(asc(clients.name));
+}
+
+export async function getClientByAsaasCustomerId(userId: number, asaasCustomerId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [record] = await db
+    .select()
+    .from(clients)
+    .where(and(eq(clients.userId, userId), eq(clients.asaasCustomerId, asaasCustomerId)))
+    .limit(1);
+  return record;
 }
 
 export async function updateClientAsaasBinding(

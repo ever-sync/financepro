@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { z } from "zod";
 import * as db from "./db";
 import * as asaas from "./asaas";
+import * as whatsapp from "./whatsapp";
 import { COOKIE_NAME } from "../shared/const";
 
 function getRequestOrigin(headers: Record<string, unknown>) {
@@ -660,6 +661,66 @@ export const appRouter = router({
     reprocess: protectedProcedure
       .input(z.object({ eventId: z.number() }))
       .mutation(({ ctx, input }) => asaas.reprocessAsaasEvent(ctx.user.id, input.eventId)),
+  }),
+
+  whatsappIntegration: router({
+    get: protectedProcedure.query(({ ctx }) =>
+      whatsapp.getWhatsAppIntegration(
+        ctx.user.id,
+        getRequestOrigin(ctx.req.headers as Record<string, unknown>)
+      )
+    ),
+    upsert: protectedProcedure
+      .input(
+        z.object({
+          provider: z.literal("uazapi").optional(),
+          instanceId: z.string().min(1),
+          apiBaseUrl: z.string().min(1),
+          apiToken: z.string().optional(),
+          authorizedPhone: z.string().min(8),
+          enabled: z.boolean().optional(),
+          automationHour: z.number().min(0).max(23).optional(),
+          timezone: z.string().optional(),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        whatsapp.upsertWhatsAppIntegration(
+          ctx.user.id,
+          input,
+          getRequestOrigin(ctx.req.headers as Record<string, unknown>)
+        )
+      ),
+    testConnection: protectedProcedure.mutation(({ ctx }) =>
+      whatsapp.testWhatsAppConnection(
+        ctx.user.id,
+        getRequestOrigin(ctx.req.headers as Record<string, unknown>)
+      )
+    ),
+    syncStatus: protectedProcedure.query(({ ctx }) => whatsapp.getWhatsAppSyncStatus(ctx.user.id)),
+    sendTestMessage: protectedProcedure.mutation(({ ctx }) => whatsapp.sendWhatsAppTestMessage(ctx.user.id)),
+  }),
+
+  assistantInbox: router({
+    list: protectedProcedure.query(({ ctx }) => whatsapp.listAssistantInbox(ctx.user.id)),
+  }),
+
+  assistantAutomation: router({
+    list: protectedProcedure.query(({ ctx }) => whatsapp.listNotificationEvents(ctx.user.id)),
+  }),
+
+  assistantPlans: router({
+    list: protectedProcedure.query(({ ctx }) => whatsapp.listAssistantPlans(ctx.user.id)),
+    getCurrent: protectedProcedure.query(({ ctx }) => whatsapp.getCurrentAssistantPlan(ctx.user.id)),
+    confirmAction: protectedProcedure
+      .input(z.object({ actionId: z.number() }))
+      .mutation(({ ctx, input }) => whatsapp.confirmAssistantPlanAction(ctx.user.id, input.actionId)),
+    snoozeAlert: protectedProcedure
+      .input(z.object({ eventId: z.number(), hours: z.number().min(1).max(168).optional() }))
+      .mutation(({ ctx, input }) => whatsapp.snoozeNotificationAlert(ctx.user.id, input.eventId, input.hours)),
+  }),
+
+  assistantAudit: router({
+    list: protectedProcedure.query(({ ctx }) => whatsapp.listAssistantRuns(ctx.user.id)),
   }),
 
   // ==================== DASHBOARDS ====================

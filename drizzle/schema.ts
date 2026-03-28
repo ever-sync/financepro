@@ -11,6 +11,51 @@ export const debtPriorityEnum = pgEnum("debt_priority", ["alta", "media", "baixa
 export const fundTypeEnum = pgEnum("fund_type", ["empresa", "pessoal"]);
 export const asaasEnvironmentEnum = pgEnum("asaas_environment", ["sandbox", "production"]);
 export const asaasSyncStatusEnum = pgEnum("asaas_sync_status", ["pendente", "sincronizado", "erro"]);
+export const whatsappProviderEnum = pgEnum("whatsapp_provider", ["uazapi"]);
+export const whatsappDirectionEnum = pgEnum("whatsapp_direction", ["inbound", "outbound"]);
+export const whatsappMessageStatusEnum = pgEnum("whatsapp_message_status", [
+  "received",
+  "processed",
+  "sent",
+  "delivered",
+  "failed",
+  "ignored",
+]);
+export const assistantRunStatusEnum = pgEnum("assistant_run_status", [
+  "recebido",
+  "analisado",
+  "aguardando_confirmacao",
+  "executado",
+  "falhou",
+  "descartado",
+]);
+export const assistantRunTriggerEnum = pgEnum("assistant_run_trigger", [
+  "direct_message",
+  "daily_digest",
+  "month_start",
+  "month_end",
+  "alert",
+  "confirmation",
+]);
+export const financialPlanStatusEnum = pgEnum("financial_plan_status", [
+  "rascunho",
+  "ativo",
+  "fechado",
+  "descartado",
+]);
+export const financialPlanActionStatusEnum = pgEnum("financial_plan_action_status", [
+  "pendente",
+  "concluida",
+  "adiada",
+  "descartada",
+]);
+export const notificationEventStatusEnum = pgEnum("notification_event_status", [
+  "agendado",
+  "enviado",
+  "falhou",
+  "adiado",
+  "descartado",
+]);
 
 // ==================== USERS ====================
 export const users = pgTable("users", {
@@ -430,6 +475,177 @@ export const asaasWebhookEvents = pgTable("asaas_webhook_events", {
 
 export type AsaasWebhookEvent = typeof asaasWebhookEvents.$inferSelect;
 export type InsertAsaasWebhookEvent = typeof asaasWebhookEvents.$inferInsert;
+
+// ==================== WHATSAPP INTEGRATIONS ====================
+export const whatsappIntegrations = pgTable("whatsapp_integrations", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  provider: whatsappProviderEnum("provider").default("uazapi").notNull(),
+  instanceId: varchar("instanceId", { length: 120 }).notNull(),
+  apiBaseUrl: varchar("apiBaseUrl", { length: 255 }).notNull(),
+  apiToken: text("apiToken").notNull(),
+  authorizedPhone: varchar("authorizedPhone", { length: 32 }).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  automationHour: integer("automationHour").default(8).notNull(),
+  timezone: varchar("timezone", { length: 80 }).default("America/Sao_Paulo").notNull(),
+  webhookUrl: varchar("webhookUrl", { length: 500 }),
+  lastConnectionStatus: varchar("lastConnectionStatus", { length: 40 }).default("pendente").notNull(),
+  lastConnectionMessage: text("lastConnectionMessage"),
+  lastConnectionCheckedAt: timestamp("lastConnectionCheckedAt"),
+  lastWebhookReceivedAt: timestamp("lastWebhookReceivedAt"),
+  lastMessageReceivedAt: timestamp("lastMessageReceivedAt"),
+  lastMessageSentAt: timestamp("lastMessageSentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type WhatsAppIntegration = typeof whatsappIntegrations.$inferSelect;
+export type InsertWhatsAppIntegration = typeof whatsappIntegrations.$inferInsert;
+
+// ==================== WHATSAPP CONTACTS ====================
+export const whatsappContacts = pgTable("whatsapp_contacts", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  integrationId: integer("integrationId").notNull(),
+  phoneNumber: varchar("phoneNumber", { length: 32 }).notNull(),
+  displayName: varchar("displayName", { length: 255 }),
+  isAuthorized: boolean("isAuthorized").default(false).notNull(),
+  lastSeenAt: timestamp("lastSeenAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type WhatsAppContact = typeof whatsappContacts.$inferSelect;
+export type InsertWhatsAppContact = typeof whatsappContacts.$inferInsert;
+
+// ==================== ASSISTANT THREADS ====================
+export const assistantThreads = pgTable("assistant_threads", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  integrationId: integer("integrationId").notNull(),
+  contactId: integer("contactId").notNull(),
+  channel: varchar("channel", { length: 40 }).default("whatsapp").notNull(),
+  status: varchar("status", { length: 40 }).default("active").notNull(),
+  lastMessageAt: timestamp("lastMessageAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AssistantThread = typeof assistantThreads.$inferSelect;
+export type InsertAssistantThread = typeof assistantThreads.$inferInsert;
+
+// ==================== WHATSAPP MESSAGES ====================
+export const whatsappMessages = pgTable("whatsapp_messages", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  integrationId: integer("integrationId").notNull(),
+  contactId: integer("contactId").notNull(),
+  threadId: integer("threadId").notNull(),
+  providerMessageId: varchar("providerMessageId", { length: 255 }),
+  direction: whatsappDirectionEnum("direction").notNull(),
+  status: whatsappMessageStatusEnum("status").default("received").notNull(),
+  textContent: text("textContent").notNull(),
+  detectedIntent: varchar("detectedIntent", { length: 80 }),
+  requiresConfirmation: boolean("requiresConfirmation").default(false).notNull(),
+  rawPayload: text("rawPayload"),
+  deliveredAt: timestamp("deliveredAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type WhatsAppMessage = typeof whatsappMessages.$inferSelect;
+export type InsertWhatsAppMessage = typeof whatsappMessages.$inferInsert;
+
+// ==================== ASSISTANT RUNS ====================
+export const assistantRuns = pgTable("assistant_runs", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  integrationId: integer("integrationId").notNull(),
+  threadId: integer("threadId").notNull(),
+  triggerType: assistantRunTriggerEnum("triggerType").notNull(),
+  status: assistantRunStatusEnum("status").default("recebido").notNull(),
+  userMessage: text("userMessage"),
+  normalizedIntent: varchar("normalizedIntent", { length: 80 }),
+  contextPayload: text("contextPayload"),
+  assistantResponse: text("assistantResponse"),
+  suggestedActions: text("suggestedActions"),
+  executedActions: text("executedActions"),
+  requiresConfirmation: boolean("requiresConfirmation").default(false).notNull(),
+  confirmedAt: timestamp("confirmedAt"),
+  expiresAt: timestamp("expiresAt"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AssistantRun = typeof assistantRuns.$inferSelect;
+export type InsertAssistantRun = typeof assistantRuns.$inferInsert;
+
+// ==================== FINANCIAL PLANS ====================
+export const financialPlans = pgTable("financial_plans", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  threadId: integer("threadId"),
+  periodMonth: integer("periodMonth").notNull(),
+  periodYear: integer("periodYear").notNull(),
+  status: financialPlanStatusEnum("status").default("rascunho").notNull(),
+  summary: text("summary").notNull(),
+  targetBalance: numeric("targetBalance", { precision: 12, scale: 2 }),
+  recommendedCashAction: text("recommendedCashAction"),
+  rawAnalysis: text("rawAnalysis"),
+  generatedAt: timestamp("generatedAt").defaultNow().notNull(),
+  confirmedAt: timestamp("confirmedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type FinancialPlan = typeof financialPlans.$inferSelect;
+export type InsertFinancialPlan = typeof financialPlans.$inferInsert;
+
+// ==================== FINANCIAL PLAN ACTIONS ====================
+export const financialPlanActions = pgTable("financial_plan_actions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  planId: integer("planId").notNull(),
+  actionType: varchar("actionType", { length: 80 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  priority: varchar("priority", { length: 20 }).default("medium").notNull(),
+  status: financialPlanActionStatusEnum("status").default("pendente").notNull(),
+  dueDate: varchar("dueDate", { length: 10 }),
+  snoozedUntil: timestamp("snoozedUntil"),
+  metadata: text("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type FinancialPlanAction = typeof financialPlanActions.$inferSelect;
+export type InsertFinancialPlanAction = typeof financialPlanActions.$inferInsert;
+
+// ==================== NOTIFICATION EVENTS ====================
+export const notificationEvents = pgTable("notification_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  integrationId: integer("integrationId").notNull(),
+  relatedRunId: integer("relatedRunId"),
+  relatedPlanId: integer("relatedPlanId"),
+  relatedMessageId: integer("relatedMessageId"),
+  type: varchar("type", { length: 80 }).notNull(),
+  scope: varchar("scope", { length: 80 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  messageBody: text("messageBody").notNull(),
+  dedupeKey: varchar("dedupeKey", { length: 160 }).notNull(),
+  status: notificationEventStatusEnum("status").default("agendado").notNull(),
+  scheduledFor: timestamp("scheduledFor"),
+  sentAt: timestamp("sentAt"),
+  snoozedUntil: timestamp("snoozedUntil"),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type NotificationEvent = typeof notificationEvents.$inferSelect;
+export type InsertNotificationEvent = typeof notificationEvents.$inferInsert;
 
 // ==================== FUNDO DE RESERVA ====================
 export const reserveFunds = pgTable("reserve_funds", {

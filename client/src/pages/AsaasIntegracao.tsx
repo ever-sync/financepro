@@ -60,7 +60,7 @@ export default function AsaasIntegracao() {
       accountName: integration.accountName || "Conta principal",
       environment: integration.environment || "sandbox",
       apiKey: "",
-      webhookAuthToken: integration.webhookAuthToken || "",
+      webhookAuthToken: "",
       enabled: integration.enabled ?? true,
     }));
   }, [integration]);
@@ -140,11 +140,16 @@ export default function AsaasIntegracao() {
             <div className="space-y-1.5">
               <Label>Token de autenticacao do webhook</Label>
               <Input
+                type="password"
+                placeholder={integration?.maskedWebhookAuthToken || "Cole aqui o token do webhook"}
                 value={form.webhookAuthToken}
                 onChange={event =>
                   setForm(prev => ({ ...prev, webhookAuthToken: event.target.value }))
                 }
               />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para manter o token atual salvo no servidor.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -176,6 +181,10 @@ export default function AsaasIntegracao() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Conexao</span>
                 <StatusBadge status={integration?.lastConnectionStatus || "pendente"} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Token do webhook</span>
+                <StatusBadge status={integration?.hasWebhookAuthToken ? "sincronizado" : "pendente"} />
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-2xl border p-3">

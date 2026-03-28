@@ -27,6 +27,25 @@ function normalizeAmount(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function toDateOnly(value: unknown) {
+  if (!value) return null;
+  const raw = String(value);
+  const directDate = raw.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (directDate) return directDate;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+function getPaymentReceivedDate(payment: AsaasPaymentRecord) {
+  return (
+    toDateOnly(payment.clientPaymentDate) ??
+    toDateOnly(payment.paymentDate) ??
+    toDateOnly(payment.confirmedDate) ??
+    toDateOnly(payment.creditDate) ??
+    toDateOnly(payment.receivedDate)
+  );
+}
+
 function getWebhookUrl(origin?: string | null) {
   if (!origin) return undefined;
   return `${origin.replace(/\/$/, "")}/api/asaas/webhook`;
@@ -264,11 +283,12 @@ async function ensureRevenueForPayment(input: {
 }) {
   const existing = await asaasDb.getRevenueByAsaasPaymentId(input.userId, String(input.payment.id));
   const localStatus = mapPaymentToLocalStatus(input.lastEvent, input.payment.status);
+  const receivedDate = getPaymentReceivedDate(input.payment);
 
   if (existing) {
     await asaasDb.updateRevenueAsaasState(input.userId, existing.id, {
       status: localStatus,
-      receivedDate: localStatus === "recebido" ? new Date().toISOString().split("T")[0] : null,
+      receivedDate: localStatus === "recebido" ? receivedDate ?? existing.receivedDate : null,
       asaasPaymentId: String(input.payment.id),
       asaasSubscriptionId: input.payment.subscription ? String(input.payment.subscription) : null,
       asaasBillingType: input.payment.billingType ? String(input.payment.billingType) : null,
@@ -299,7 +319,7 @@ async function ensureRevenueForPayment(input: {
     netAmount: toDecimalString(netAmount),
     client: localClient?.name ?? null,
     dueDate: String(input.payment.dueDate),
-    receivedDate: localStatus === "recebido" ? new Date().toISOString().split("T")[0] : null,
+    receivedDate: localStatus === "recebido" ? receivedDate : null,
     status: localStatus,
     seriesId: null,
     asaasPaymentId: String(input.payment.id),
@@ -343,8 +363,9 @@ export async function getAsaasIntegration(userId: number, origin?: string | null
       enabled: false,
       accountName: "Conta principal",
       webhookUrl: getWebhookUrl(origin) ?? "",
-      webhookAuthToken: "",
       maskedApiKey: "",
+      maskedWebhookAuthToken: "",
+      hasWebhookAuthToken: false,
       apiBaseUrl: getAsaasBaseUrl("sandbox"),
       lastConnectionStatus: "pendente",
       lastConnectionMessage: null,
@@ -359,8 +380,9 @@ export async function getAsaasIntegration(userId: number, origin?: string | null
     enabled: account.enabled,
     accountName: account.accountName,
     webhookUrl: account.webhookUrl || getWebhookUrl(origin) || "",
-    webhookAuthToken: account.webhookAuthToken || "",
     maskedApiKey: maskSecret(account.apiKey),
+    maskedWebhookAuthToken: maskSecret(account.webhookAuthToken),
+    hasWebhookAuthToken: !!account.webhookAuthToken,
     apiBaseUrl: getAsaasBaseUrl(account.environment, account.apiBaseUrl),
     lastConnectionStatus: account.lastConnectionStatus,
     lastConnectionMessage: account.lastConnectionMessage,
@@ -380,7 +402,7 @@ export async function upsertAsaasIntegration(
   origin?: string | null
 ) {
   const webhookUrl = getWebhookUrl(origin);
-  const saved = await asaasDb.upsertAsaasAccount(userId, {
+  await asaasDb.upsertAsaasAccount(userId, {
     accountName: input.accountName ?? "Conta principal",
     environment: input.environment,
     apiKey: input.apiKey,
@@ -753,11 +775,19 @@ async function processAsaasWebhookPayload(account: NonNullable<Awaited<ReturnTyp
 
   if (payload.payment?.id) {
     const localCharge = await asaasDb.getAsaasChargeByExternalId(account.id, String(payload.payment.id));
+    const localSubscription =
+      payload.payment.subscription != null
+        ? await asaasDb.getAsaasSubscriptionByExternalId(account.id, String(payload.payment.subscription))
+        : undefined;
+    const localClient =
+      payload.payment.customer != null
+        ? await asaasDb.getClientByAsaasCustomerId(account.userId, String(payload.payment.customer))
+        : undefined;
     const mirror = await syncPaymentMirror({
       userId: account.userId,
       accountId: account.id,
-      clientId: localCharge?.clientId ?? null,
-      serviceId: localCharge?.serviceId ?? null,
+      clientId: localCharge?.clientId ?? localSubscription?.clientId ?? localClient?.id ?? null,
+      serviceId: localCharge?.serviceId ?? localSubscription?.serviceId ?? null,
       payment: payload.payment,
       pix: null,
       lastEvent: eventType,
@@ -783,7 +813,61 @@ async function processAsaasWebhookPayload(account: NonNullable<Awaited<ReturnTyp
     return { kind: "invoice", id: mirror.id, eventType };
   }
 
+  if (payload.subscription?.id) {
+    const localSubscription = await asaasDb.getAsaasSubscriptionByExternalId(
+      account.id,
+      String(payload.subscription.id)
+    );
+    const localClient =
+      payload.subscription.customer != null
+        ? await asaasDb.getClientByAsaasCustomerId(account.userId, String(payload.subscription.customer))
+        : undefined;
+    const mirror = await asaasDb.upsertAsaasSubscription(
+      buildSubscriptionMirror({
+        userId: account.userId,
+        accountId: account.id,
+        clientId: localSubscription?.clientId ?? localClient?.id ?? null,
+        serviceId: localSubscription?.serviceId ?? null,
+        subscription: payload.subscription,
+      })
+    );
+    return { kind: "subscription", id: mirror.id, eventType };
+  }
+
   return { kind: "ignored", eventType };
+}
+
+async function maybeSendAsaasAlert(
+  account: NonNullable<Awaited<ReturnType<typeof asaasDb.getAsaasAccountByWebhookToken>>>,
+  payload: AnyRecord
+) {
+  const eventType = String(payload.event || "UNKNOWN");
+  if (!["PAYMENT_RECEIVED", "PAYMENT_CONFIRMED", "PAYMENT_OVERDUE", "PAYMENT_DELETED"].includes(eventType)) {
+    return;
+  }
+
+  const payment = payload.payment;
+  if (!payment?.id) return;
+
+  const value = Number(payment.value ?? 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+  const titleMap: Record<string, string> = {
+    PAYMENT_RECEIVED: "Cobranca recebida",
+    PAYMENT_CONFIRMED: "Cobranca confirmada",
+    PAYMENT_OVERDUE: "Cobranca vencida",
+    PAYMENT_DELETED: "Cobranca cancelada",
+  };
+
+  const { sendImmediateFinancialAlert } = await import("./whatsapp");
+  await sendImmediateFinancialAlert({
+    userId: account.userId,
+    title: titleMap[eventType] || "Atualizacao de cobranca",
+    message: `Pagamento ${payment.id} no valor de ${value}. Evento recebido: ${eventType}.`,
+    type: `asaas_${eventType.toLowerCase()}`,
+    dedupeKey: `asaas-alert:${eventType}:${payment.id}`,
+  }).catch(() => null);
 }
 
 export async function handleAsaasWebhook(authToken: string | undefined, payload: AnyRecord) {
@@ -799,7 +883,28 @@ export async function handleAsaasWebhook(authToken: string | undefined, payload:
   const fingerprint = getEventFingerprint(payload);
   const existing = await asaasDb.findAsaasEventByFingerprint(fingerprint);
   if (existing) {
-    return { duplicate: true, eventId: existing.id };
+    if (existing.processed) {
+      return { duplicate: true, eventId: existing.id };
+    }
+
+    try {
+      const result = await processAsaasWebhookPayload(account, payload);
+      await maybeSendAsaasAlert(account, payload);
+      await asaasDb.updateAsaasWebhookEvent(existing.id, {
+        processed: true,
+        duplicate: false,
+        processedAt: new Date(),
+        lastError: null,
+      });
+      return { duplicate: false, retried: true, eventId: existing.id, result };
+    } catch (error) {
+      await asaasDb.updateAsaasWebhookEvent(existing.id, {
+        processed: false,
+        processedAt: new Date(),
+        lastError: error instanceof Error ? error.message : "Erro ao processar evento",
+      });
+      throw error;
+    }
   }
 
   const event = await asaasDb.createAsaasWebhookEvent({
@@ -807,12 +912,14 @@ export async function handleAsaasWebhook(authToken: string | undefined, payload:
     accountId: account.id,
     eventFingerprint: fingerprint,
     eventType: String(payload.event || "UNKNOWN"),
-    resourceType: payload.payment ? "payment" : payload.invoice ? "invoice" : "generic",
+    resourceType: payload.payment ? "payment" : payload.invoice ? "invoice" : payload.subscription ? "subscription" : "generic",
     resourceId:
       payload.payment?.id
         ? String(payload.payment.id)
         : payload.invoice?.id
           ? String(payload.invoice.id)
+          : payload.subscription?.id
+            ? String(payload.subscription.id)
           : null,
     duplicate: false,
     processed: false,
@@ -823,6 +930,7 @@ export async function handleAsaasWebhook(authToken: string | undefined, payload:
 
   try {
     const result = await processAsaasWebhookPayload(account, payload);
+    await maybeSendAsaasAlert(account, payload);
     await asaasDb.updateAsaasWebhookEvent(event.id, {
       processed: true,
       processedAt: new Date(),
@@ -850,6 +958,7 @@ export async function reprocessAsaasEvent(userId: number, eventId: number) {
   }
   const payload = JSON.parse(event.payload);
   const result = await processAsaasWebhookPayload(account, payload);
+  await maybeSendAsaasAlert(account, payload);
   await asaasDb.updateAsaasWebhookEvent(event.id, {
     processed: true,
     processedAt: new Date(),

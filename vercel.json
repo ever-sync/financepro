@@ -11,6 +11,22 @@
     "api/asaas/webhook.ts": {
       "maxDuration": 30,
       "includeFiles": "dist/asaas-webhook.js"
+    },
+    "api/whatsapp/uazapi/webhook.ts": {
+      "maxDuration": 30,
+      "includeFiles": "dist/whatsapp-webhook.js"
+    },
+    "api/cron/financial-daily.ts": {
+      "maxDuration": 30,
+      "includeFiles": "dist/assistant-cron.js"
+    },
+    "api/cron/financial-month-start.ts": {
+      "maxDuration": 30,
+      "includeFiles": "dist/assistant-cron.js"
+    },
+    "api/cron/financial-month-end.ts": {
+      "maxDuration": 30,
+      "includeFiles": "dist/assistant-cron.js"
     }
   },
   "rewrites": [

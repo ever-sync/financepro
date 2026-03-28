@@ -32,6 +32,7 @@ import {
   DollarSign,
   FileText,
   FileSpreadsheet,
+  MessageCircle,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -40,6 +41,7 @@ import {
   Repeat,
   Settings,
   ShieldCheck,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   Truck,
@@ -127,6 +129,16 @@ const useSidebarSections = () => {
           { icon: Repeat, label: "Assinaturas", path: "/asaas/assinaturas" },
           { icon: FileSpreadsheet, label: "Notas fiscais", path: "/asaas/notas" },
           { icon: FileText, label: "Eventos", path: "/asaas/eventos" },
+        ],
+      },
+      {
+        label: "WhatsApp IA",
+        items: [
+          { icon: MessageCircle, label: "Integracao", path: "/whatsapp/integracao" },
+          { icon: MessageCircle, label: "Conversas", path: "/whatsapp/conversas" },
+          { icon: Repeat, label: "Automacao", path: "/whatsapp/automacao" },
+          { icon: Sparkles, label: "Planos mensais", path: "/whatsapp/planos" },
+          { icon: FileText, label: "Auditoria", path: "/whatsapp/auditoria" },
         ],
       },
       {
