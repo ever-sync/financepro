@@ -455,6 +455,59 @@ export const asaasInvoices = pgTable("asaas_invoices", {
 export type AsaasInvoice = typeof asaasInvoices.$inferSelect;
 export type InsertAsaasInvoice = typeof asaasInvoices.$inferInsert;
 
+// ==================== ASAAS TRANSFERS ====================
+export const asaasTransfers = pgTable("asaas_transfers", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  accountId: integer("accountId").notNull(),
+  asaasTransferId: varchar("asaasTransferId", { length: 64 }).notNull(),
+  status: varchar("status", { length: 60 }).default("PENDING").notNull(),
+  transferType: varchar("transferType", { length: 60 }),
+  operationType: varchar("operationType", { length: 60 }),
+  value: numeric("value", { precision: 12, scale: 2 }).notNull(),
+  netValue: numeric("netValue", { precision: 12, scale: 2 }),
+  transferDate: varchar("transferDate", { length: 10 }),
+  scheduledDate: varchar("scheduledDate", { length: 10 }),
+  effectiveDate: varchar("effectiveDate", { length: 10 }),
+  bankName: varchar("bankName", { length: 255 }),
+  recipientName: varchar("recipientName", { length: 255 }),
+  externalReference: varchar("externalReference", { length: 120 }),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  rawPayload: text("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasTransfer = typeof asaasTransfers.$inferSelect;
+export type InsertAsaasTransfer = typeof asaasTransfers.$inferInsert;
+
+// ==================== ASAAS FINANCIAL TRANSACTIONS ====================
+export const asaasFinancialTransactions = pgTable("asaas_financial_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  accountId: integer("accountId").notNull(),
+  asaasTransactionId: varchar("asaasTransactionId", { length: 120 }).notNull(),
+  transactionType: varchar("transactionType", { length: 60 }),
+  entryType: varchar("entryType", { length: 60 }),
+  status: varchar("status", { length: 60 }),
+  description: text("description"),
+  value: numeric("value", { precision: 12, scale: 2 }).notNull(),
+  balance: numeric("balance", { precision: 12, scale: 2 }),
+  transactionDate: varchar("transactionDate", { length: 10 }),
+  effectiveDate: varchar("effectiveDate", { length: 10 }),
+  asaasChargeId: varchar("asaasChargeId", { length: 64 }),
+  asaasTransferId: varchar("asaasTransferId", { length: 64 }),
+  asaasInvoiceId: varchar("asaasInvoiceId", { length: 64 }),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  rawPayload: text("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type AsaasFinancialTransaction = typeof asaasFinancialTransactions.$inferSelect;
+export type InsertAsaasFinancialTransaction = typeof asaasFinancialTransactions.$inferInsert;
+
 // ==================== ASAAS WEBHOOK EVENTS ====================
 export const asaasWebhookEvents = pgTable("asaas_webhook_events", {
   id: serial("id").primaryKey(),

@@ -572,6 +572,19 @@ export const appRouter = router({
       ),
     testConnection: protectedProcedure.mutation(({ ctx }) => asaas.testAsaasConnection(ctx.user.id)),
     syncStatus: protectedProcedure.query(({ ctx }) => asaas.getAsaasSyncStatus(ctx.user.id)),
+    importHistory: protectedProcedure
+      .input(
+        z
+          .object({
+            charges: z.boolean().optional(),
+            subscriptions: z.boolean().optional(),
+            invoices: z.boolean().optional(),
+            transfers: z.boolean().optional(),
+            financialTransactions: z.boolean().optional(),
+          })
+          .optional()
+      )
+      .mutation(({ ctx, input }) => asaas.importAsaasHistory(ctx.user.id, input)),
   }),
 
   asaasCustomers: router({
@@ -654,6 +667,16 @@ export const appRouter = router({
     resend: protectedProcedure
       .input(z.object({ invoiceId: z.number() }))
       .mutation(({ ctx, input }) => asaas.resendAsaasInvoice(ctx.user.id, input.invoiceId)),
+  }),
+
+  asaasTransfers: router({
+    list: protectedProcedure.query(({ ctx }) => asaas.listAsaasTransfers(ctx.user.id)),
+  }),
+
+  asaasFinancialTransactions: router({
+    list: protectedProcedure.query(({ ctx }) =>
+      asaas.listAsaasFinancialTransactions(ctx.user.id)
+    ),
   }),
 
   asaasEvents: router({

@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,22 @@ export default function AsaasIntegracao() {
     },
     onError: error => toast.error(error.message),
   });
+  const importHistoryMut = trpc.asaasIntegration.importHistory.useMutation({
+    onSuccess: data => {
+      utils.asaasIntegration.syncStatus.invalidate();
+      utils.asaasCharges.list.invalidate();
+      utils.asaasSubscriptions.list.invalidate();
+      utils.asaasInvoices.list.invalidate();
+      utils.asaasTransfers.list.invalidate();
+      utils.asaasFinancialTransactions.list.invalidate();
+      utils.asaasEvents.list.invalidate();
+      utils.revenues.list.invalidate();
+      toast.success(
+        `Importacao concluida: ${data.charges} cobrancas, ${data.subscriptions} assinaturas, ${data.invoices} notas, ${data.transfers} transferencias e ${data.financialTransactions} lancamentos.`
+      );
+    },
+    onError: error => toast.error(error.message),
+  });
 
   const [form, setForm] = useState({
     accountName: "Conta principal",
@@ -68,6 +85,14 @@ export default function AsaasIntegracao() {
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Carregando integracao do Asaas...</div>;
   }
+
+  const runImport = (scope?: {
+    charges?: boolean;
+    subscriptions?: boolean;
+    invoices?: boolean;
+    transfers?: boolean;
+    financialTransactions?: boolean;
+  }) => importHistoryMut.mutate(scope);
 
   return (
     <div className="space-y-6">
@@ -205,6 +230,24 @@ export default function AsaasIntegracao() {
                   <p className="text-muted-foreground">Eventos</p>
                   <p className="mt-1 text-xl font-semibold">{status?.totals.events || 0}</p>
                 </div>
+                <div className="rounded-2xl border p-3">
+                  <p className="text-muted-foreground">Transferencias</p>
+                  <p className="mt-1 text-xl font-semibold">{status?.totals.transfers || 0}</p>
+                </div>
+                <div className="rounded-2xl border p-3">
+                  <p className="text-muted-foreground">Extrato</p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {status?.totals.financialTransactions || 0}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-2xl border p-3 text-sm">
+                <p className="text-muted-foreground">Saldo atual da conta</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {status?.totals.currentBalance
+                    ? formatCurrency(status.totals.currentBalance)
+                    : "-"}
+                </p>
               </div>
               {integration?.lastConnectionMessage ? (
                 <p className="rounded-2xl bg-muted px-3 py-2 text-sm text-muted-foreground">
@@ -245,6 +288,66 @@ export default function AsaasIntegracao() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Importacao inicial</CardTitle>
+              <CardDescription>
+                Puxa o historico ja existente no Asaas para o espelho local do FinancePRO.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                className="w-full"
+                onClick={() => runImport()}
+                disabled={importHistoryMut.isPending}
+              >
+                {importHistoryMut.isPending ? "Importando..." : "Importar historico completo"}
+              </Button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  variant="outline"
+                  onClick={() => runImport({ charges: true, subscriptions: false, invoices: false, transfers: false, financialTransactions: false })}
+                  disabled={importHistoryMut.isPending}
+                >
+                  Importar cobrancas
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => runImport({ charges: false, subscriptions: true, invoices: false, transfers: false, financialTransactions: false })}
+                  disabled={importHistoryMut.isPending}
+                >
+                  Importar assinaturas
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => runImport({ charges: false, subscriptions: false, invoices: true, transfers: false, financialTransactions: false })}
+                  disabled={importHistoryMut.isPending}
+                >
+                  Importar notas
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => runImport({ charges: false, subscriptions: false, invoices: false, transfers: true, financialTransactions: false })}
+                  disabled={importHistoryMut.isPending}
+                >
+                  Importar transferencias
+                </Button>
+                <Button
+                  variant="outline"
+                  className="sm:col-span-2"
+                  onClick={() => runImport({ charges: false, subscriptions: false, invoices: false, transfers: false, financialTransactions: true })}
+                  disabled={importHistoryMut.isPending}
+                >
+                  Importar extrato
+                </Button>
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Eventos antigos do Asaas nao possuem importacao historica dedicada no app. A trilha
+                de eventos continua sendo alimentada pelo webhook a partir da ativacao.
+              </p>
             </CardContent>
           </Card>
         </div>

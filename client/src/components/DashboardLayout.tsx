@@ -4,14 +4,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
@@ -128,6 +122,8 @@ const useSidebarSections = () => {
           { icon: Receipt, label: "Cobrancas", path: "/asaas/cobrancas" },
           { icon: Repeat, label: "Assinaturas", path: "/asaas/assinaturas" },
           { icon: FileSpreadsheet, label: "Notas fiscais", path: "/asaas/notas" },
+          { icon: Repeat, label: "Transferencias", path: "/asaas/transferencias" },
+          { icon: FileText, label: "Extrato", path: "/asaas/extrato" },
           { icon: FileText, label: "Eventos", path: "/asaas/eventos" },
         ],
       },
@@ -347,22 +343,21 @@ function DashboardSidebar({
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="space-y-3 px-2 pb-3">
+      <SidebarContent className="px-2 pb-6">
+        <div className="space-y-5">
         {sections.map(section => (
-          <SidebarGroup key={section.label} className="px-0 py-0">
-            <SidebarGroupLabel className="mb-2 !h-auto px-3 py-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 group-data-[collapsible=icon]:hidden">
+          <section key={section.label} className="space-y-2">
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 group-data-[collapsible=icon]:hidden">
               {section.label}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-2">
+            </p>
+            <div className="space-y-1.5">
                 {section.items.map(item => {
                   const isActive = location === item.path;
 
                   return (
-                    <SidebarMenuItem key={item.path}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        tooltip={item.label}
+                    <button
+                      key={item.path}
+                      type="button"
                         onClick={() => {
                           onNavigate(item.path);
                           if (isMobile) {
@@ -370,9 +365,9 @@ function DashboardSidebar({
                           }
                         }}
                         className={cn(
-                          "h-10.5 rounded-full px-3.5 text-[13px] font-medium leading-none text-zinc-500 transition-all sm:h-11 sm:text-sm",
+                          "flex min-h-11 w-full items-center gap-3 rounded-[22px] px-3.5 py-2.5 text-left text-[13px] font-medium leading-snug text-zinc-500 transition-all sm:text-sm",
                           "hover:bg-zinc-100 hover:text-zinc-900",
-                          "data-[active=true]:bg-zinc-900 data-[active=true]:text-white data-[active=true]:shadow-[0_14px_32px_rgba(15,23,42,0.18)]",
+                          isActive && "bg-zinc-900 text-white shadow-[0_14px_32px_rgba(15,23,42,0.18)]",
                           "group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
                         )}
                       >
@@ -382,17 +377,16 @@ function DashboardSidebar({
                             isActive ? "text-white" : "text-zinc-500"
                           )}
                         />
-                        <span className="truncate leading-none group-data-[collapsible=icon]:hidden">
+                        <span className="min-w-0 whitespace-normal text-left leading-snug group-data-[collapsible=icon]:hidden">
                           {item.label}
                         </span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    </button>
                   );
                 })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+            </div>
+          </section>
         ))}
+        </div>
       </SidebarContent>
 
       <SidebarFooter className="p-3 pt-2">

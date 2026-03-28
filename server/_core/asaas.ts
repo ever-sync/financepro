@@ -132,6 +132,44 @@ export type AsaasInvoiceRecord = Record<string, unknown> & {
   cancelledAt?: string | null;
 };
 
+export type AsaasTransferRecord = Record<string, unknown> & {
+  id: string;
+  status?: string | null;
+  value?: number | string | null;
+  amount?: number | string | null;
+  netValue?: number | string | null;
+  transferDate?: string | null;
+  effectiveDate?: string | null;
+  scheduleDate?: string | null;
+  scheduledDate?: string | null;
+  transferType?: string | null;
+  operationType?: string | null;
+  externalReference?: string | null;
+  bankAccount?: Record<string, unknown> | null;
+};
+
+export type AsaasFinancialTransactionRecord = Record<string, unknown> & {
+  id?: string | number | null;
+  type?: string | null;
+  transactionType?: string | null;
+  entryType?: string | null;
+  status?: string | null;
+  value?: number | string | null;
+  amount?: number | string | null;
+  balance?: number | string | null;
+  description?: string | null;
+  date?: string | null;
+  transactionDate?: string | null;
+  effectiveDate?: string | null;
+  payment?: string | Record<string, unknown> | null;
+  transfer?: string | Record<string, unknown> | null;
+  invoice?: string | Record<string, unknown> | null;
+};
+
+export type AsaasBalanceRecord = Record<string, unknown> & {
+  balance?: number | string | null;
+};
+
 export class AsaasRequestError extends Error {
   status: number;
   payload: unknown;
@@ -282,6 +320,26 @@ export class AsaasClient {
     return this.request<AsaasListResponse<AsaasInvoiceRecord>>(() =>
       this.client.get("/v3/invoices", { params })
     );
+  }
+
+  async listTransfers(params?: Record<string, unknown>) {
+    return this.request<AsaasListResponse<AsaasTransferRecord>>(() =>
+      this.client.get("/v3/transfers", { params })
+    );
+  }
+
+  async getTransfer(transferId: string) {
+    return this.request<AsaasTransferRecord>(() => this.client.get(`/v3/transfers/${transferId}`));
+  }
+
+  async listFinancialTransactions(params?: Record<string, unknown>) {
+    return this.request<AsaasListResponse<AsaasFinancialTransactionRecord>>(() =>
+      this.client.get("/v3/financialTransactions", { params })
+    );
+  }
+
+  async getBalance() {
+    return this.request<AsaasBalanceRecord>(() => this.client.get("/v3/finance/balance"));
   }
 
   async getInvoice(invoiceId: string) {

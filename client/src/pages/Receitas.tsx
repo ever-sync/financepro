@@ -41,7 +41,8 @@ function buildRecurrenceDates(startDate: string, recurrence: string): string[] {
 export default function Receitas() {
   const { month, year, monthName, goToPrevMonth, goToNextMonth } = useMonthYear();
   const utils = trpc.useUtils();
-  const { data: items = [], isLoading } = trpc.revenues.list.useQuery({ month, year });
+  const { data: items, isLoading } = trpc.revenues.list.useQuery({ month, year });
+  const rows = Array.isArray(items) ? items : items?.data ?? [];
   const { data: settings } = trpc.settings.get.useQuery();
   const { data: clients = [] } = trpc.clients.list.useQuery();
   const { data: services = [] } = trpc.services.list.useQuery();
@@ -54,7 +55,7 @@ export default function Receitas() {
 
   // ── form state ──
   const [open, setOpen]               = useState(false);
-  const [editingItem, setEditingItem] = useState<typeof items[0] | null>(null);
+  const [editingItem, setEditingItem] = useState<(typeof rows)[number] | null>(null);
   const [form, setForm]               = useState<FormState>(EMPTY);
   const [selectedService, setSelectedService] = useState("");
   const [quantity, setQuantity]       = useState("1");
@@ -62,7 +63,7 @@ export default function Receitas() {
   const [submitting, setSubmitting]   = useState(false);
 
   // ── series dialogs ──
-  const [deleteDialog, setDeleteDialog]       = useState<typeof items[0] | null>(null);
+  const [deleteDialog, setDeleteDialog]       = useState<(typeof rows)[number] | null>(null);
   const [seriesEditDialog, setSeriesEditDialog] = useState<{ payload: Parameters<typeof updateMutation.mutate>[0]; seriesId: string } | null>(null);
 
   const taxRate = parseFloat(settings?.taxPercent || "6") / 100;
@@ -74,7 +75,7 @@ export default function Receitas() {
 
   const openCreate = () => { setEditingItem(null); setForm(EMPTY); setSelectedService(""); setQuantity("1"); setRecurrence("unico"); setOpen(true); };
 
-  const openEdit = (item: typeof items[0]) => {
+  const openEdit = (item: (typeof rows)[number]) => {
     setEditingItem(item);
     setForm({ description: item.description, category: item.category, grossAmount: parseFloat(item.grossAmount).toFixed(2), client: item.client ?? "", dueDate: item.dueDate, status: item.status });
     setSelectedService(""); setQuantity("1"); setRecurrence("unico");
@@ -146,21 +147,21 @@ export default function Receitas() {
     finally { setSubmitting(false); }
   };
 
-  const handleDelete = (item: typeof items[0]) => {
+  const handleDelete = (item: (typeof rows)[number]) => {
     if (item.seriesId) { setDeleteDialog(item); return; }
     deleteMutation.mutate({ id: item.id });
   };
 
-  const toggleStatus = (item: typeof items[0]) => {
+  const toggleStatus = (item: (typeof rows)[number]) => {
     const next = item.status === "recebido" ? "pendente" : item.status === "cancelado" ? "pendente" : "recebido";
     updateMutation.mutate({ id: item.id, status: next, receivedDate: next === "recebido" ? new Date().toISOString().split("T")[0] : null });
   };
 
   const isPending   = submitting || updateMutation.isPending || updateSeriesMut.isPending;
   const gross       = parseFloat(form.grossAmount) || 0;
-  const totalGross  = items.reduce((s, i) => s + parseFloat(i.grossAmount), 0);
-  const totalNet    = items.reduce((s, i) => s + parseFloat(i.netAmount), 0);
-  const totalReceived = items.filter(i => i.status === "recebido").reduce((s, i) => s + parseFloat(i.grossAmount), 0);
+  const totalGross  = rows.reduce((s, i) => s + parseFloat(i.grossAmount), 0);
+  const totalNet    = rows.reduce((s, i) => s + parseFloat(i.netAmount), 0);
+  const totalReceived = rows.filter(i => i.status === "recebido").reduce((s, i) => s + parseFloat(i.grossAmount), 0);
 
   return (
     <div className="space-y-6">
@@ -399,9 +400,9 @@ export default function Receitas() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : items.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhuma receita neste mês</TableCell></TableRow>
-              ) : items.map(item => (
+              ) : rows.map(item => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">

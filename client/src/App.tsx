@@ -28,6 +28,8 @@ const AsaasIntegracao = lazy(() => import("./pages/AsaasIntegracao"));
 const AsaasCobrancas = lazy(() => import("./pages/AsaasCobrancas"));
 const AsaasAssinaturas = lazy(() => import("./pages/AsaasAssinaturas"));
 const AsaasNotas = lazy(() => import("./pages/AsaasNotas"));
+const AsaasTransferencias = lazy(() => import("./pages/AsaasTransferencias"));
+const AsaasExtrato = lazy(() => import("./pages/AsaasExtrato"));
 const AsaasEventos = lazy(() => import("./pages/AsaasEventos"));
 const WhatsAppIntegracao = lazy(() => import("./pages/WhatsAppIntegracao"));
 const WhatsAppConversas = lazy(() => import("./pages/WhatsAppConversas"));
@@ -72,6 +74,8 @@ function Router() {
           <Route path="/asaas/cobrancas" component={AsaasCobrancas} />
           <Route path="/asaas/assinaturas" component={AsaasAssinaturas} />
           <Route path="/asaas/notas" component={AsaasNotas} />
+          <Route path="/asaas/transferencias" component={AsaasTransferencias} />
+          <Route path="/asaas/extrato" component={AsaasExtrato} />
           <Route path="/asaas/eventos" component={AsaasEventos} />
           <Route path="/whatsapp/integracao" component={WhatsAppIntegracao} />
           <Route path="/whatsapp/conversas" component={WhatsAppConversas} />

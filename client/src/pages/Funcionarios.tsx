@@ -29,7 +29,8 @@ const EMPTY: FormState = { name: "", role: "", salary: "", paymentDay: "5", admi
 
 export default function Funcionarios() {
   const utils = trpc.useUtils();
-  const { data: items = [], isLoading } = trpc.employees.list.useQuery();
+  const { data: items, isLoading } = trpc.employees.list.useQuery();
+  const rows = Array.isArray(items) ? items : items?.data ?? [];
   const createMut = trpc.employees.create.useMutation({ onSuccess: () => { utils.employees.list.invalidate(); toast.success("Funcionário adicionado"); closeDialog(); } });
   const updateMut = trpc.employees.update.useMutation({ onSuccess: () => { utils.employees.list.invalidate(); toast.success("Funcionário atualizado"); closeDialog(); } });
   const deleteMut = trpc.employees.delete.useMutation({ onSuccess: () => { utils.employees.list.invalidate(); toast.success("Removido"); } });
@@ -44,7 +45,7 @@ export default function Funcionarios() {
 
   const openCreate = () => { setEditingId(null); setForm(EMPTY); setOpen(true); };
 
-  const openEdit = (item: typeof items[0]) => {
+  const openEdit = (item: (typeof rows)[number]) => {
     setEditingId(item.id);
     setForm({
       name: item.name,
@@ -87,12 +88,12 @@ export default function Funcionarios() {
     }
   };
 
-  const toggleStatus = (item: typeof items[0]) => {
+  const toggleStatus = (item: (typeof rows)[number]) => {
     updateMut.mutate({ id: item.id, status: item.status === "ativo" ? "inativo" : "ativo" });
   };
 
   const isPending = createMut.isPending || updateMut.isPending;
-  const activeEmployees = items.filter(i => i.status === "ativo");
+  const activeEmployees = rows.filter(i => i.status === "ativo");
   const totalPayroll = activeEmployees.reduce((s, i) => s + parseFloat(i.totalCost), 0);
   const totalSalaries = activeEmployees.reduce((s, i) => s + parseFloat(i.salary), 0);
 
@@ -265,9 +266,9 @@ export default function Funcionarios() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : items.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum funcionário cadastrado</TableCell></TableRow>
-              ) : items.map(item => (
+              ) : rows.map(item => (
                 <TableRow key={item.id} className={item.status === "inativo" ? "opacity-50" : ""}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>{item.role}</TableCell>

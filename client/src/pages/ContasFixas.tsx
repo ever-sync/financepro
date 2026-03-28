@@ -19,7 +19,8 @@ const categories = ["Aluguel/Moradia", "Condomínio", "Energia", "Água", "Inter
 export default function ContasFixas() {
   const { month, year, monthName, goToPrevMonth, goToNextMonth } = useMonthYear();
   const utils = trpc.useUtils();
-  const { data: items = [], isLoading } = trpc.personalFixedCosts.list.useQuery({ month, year });
+  const { data: items, isLoading } = trpc.personalFixedCosts.list.useQuery({ month, year });
+  const rows = Array.isArray(items) ? items : items?.data ?? [];
   const createMut = trpc.personalFixedCosts.create.useMutation({ onSuccess: () => { utils.personalFixedCosts.list.invalidate(); toast.success("Conta adicionada"); setOpen(false); } });
   const updateMut = trpc.personalFixedCosts.update.useMutation({ onSuccess: () => { utils.personalFixedCosts.list.invalidate(); } });
   const deleteMut = trpc.personalFixedCosts.delete.useMutation({ onSuccess: () => { utils.personalFixedCosts.list.invalidate(); toast.success("Removida"); } });
@@ -37,13 +38,13 @@ export default function ContasFixas() {
     });
   };
 
-  const toggleStatus = (item: typeof items[0]) => {
+  const toggleStatus = (item: (typeof rows)[number]) => {
     const next = item.status === "pago" ? "pendente" : "pago";
     updateMut.mutate({ id: item.id, status: next });
   };
 
-  const total = items.reduce((s, i) => s + parseFloat(i.amount), 0);
-  const totalPaid = items.filter(i => i.status === "pago").reduce((s, i) => s + parseFloat(i.amount), 0);
+  const total = rows.reduce((s, i) => s + parseFloat(i.amount), 0);
+  const totalPaid = rows.filter(i => i.status === "pago").reduce((s, i) => s + parseFloat(i.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -100,9 +101,9 @@ export default function ContasFixas() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : items.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma conta fixa neste mês</TableCell></TableRow>
-              ) : items.map(item => (
+              ) : rows.map(item => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.description}</TableCell>
                   <TableCell>{item.category}</TableCell>

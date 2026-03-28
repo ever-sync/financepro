@@ -15,7 +15,8 @@ const types = ["CDB", "Tesouro Direto", "LCI/LCA", "Ações", "FII", "Poupança"
 
 export default function Investimentos() {
   const utils = trpc.useUtils();
-  const { data: items = [], isLoading } = trpc.investments.list.useQuery();
+  const { data: items, isLoading } = trpc.investments.list.useQuery();
+  const rows = Array.isArray(items) ? items : items?.data ?? [];
   const createMut = trpc.investments.create.useMutation({ onSuccess: () => { utils.investments.list.invalidate(); toast.success("Investimento adicionado"); setOpen(false); } });
   const deleteMut = trpc.investments.delete.useMutation({ onSuccess: () => { utils.investments.list.invalidate(); toast.success("Removido"); } });
   const [open, setOpen] = useState(false);
@@ -34,9 +35,9 @@ export default function Investimentos() {
     });
   };
 
-  const totalDeposited = items.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
-  const totalBalance = items.reduce((s, i) => s + parseFloat(i.currentBalance), 0);
-  const totalYield = items.reduce((s, i) => s + parseFloat(i.yieldAmount), 0);
+  const totalDeposited = rows.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
+  const totalBalance = rows.reduce((s, i) => s + parseFloat(i.currentBalance), 0);
+  const totalYield = rows.reduce((s, i) => s + parseFloat(i.yieldAmount), 0);
 
   return (
     <div className="space-y-6">
@@ -97,9 +98,9 @@ export default function Investimentos() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : items.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum investimento cadastrado</TableCell></TableRow>
-              ) : items.map(item => (
+              ) : rows.map(item => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.description}</TableCell>
                   <TableCell>{item.institution}</TableCell>

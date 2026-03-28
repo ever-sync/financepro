@@ -1,16 +1,24 @@
 import { createHash, randomUUID } from "crypto";
 import { TRPCError } from "@trpc/server";
-import type { InsertAsaasCharge, InsertAsaasInvoice, InsertAsaasSubscription } from "../drizzle/schema";
+import type {
+  InsertAsaasCharge,
+  InsertAsaasFinancialTransaction,
+  InsertAsaasInvoice,
+  InsertAsaasSubscription,
+  InsertAsaasTransfer,
+} from "../drizzle/schema";
 import {
   AsaasClient,
   type AsaasBillingType,
   type AsaasCustomerRecord,
   type AsaasEnvironment,
+  type AsaasFinancialTransactionRecord,
   type AsaasInvoiceRecord,
   type AsaasPaymentRecord,
   type AsaasPixQrCodeRecord,
   type AsaasSubscriptionCycle,
   type AsaasSubscriptionRecord,
+  type AsaasTransferRecord,
   getAsaasBaseUrl,
   mapClientToAsaasCustomer,
 } from "./_core/asaas";
@@ -36,6 +44,19 @@ function toDateOnly(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 }
 
+function getNestedString(value: unknown, path: string[]) {
+  let current: any = value;
+  for (const key of path) {
+    if (current == null || typeof current !== "object") return null;
+    current = current[key];
+  }
+  return current == null ? null : String(current);
+}
+
+function buildSyntheticExternalId(prefix: string, payload: unknown) {
+  return `${prefix}_${createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32)}`;
+}
+
 function getPaymentReceivedDate(payment: AsaasPaymentRecord) {
   return (
     toDateOnly(payment.clientPaymentDate) ??
@@ -44,6 +65,16 @@ function getPaymentReceivedDate(payment: AsaasPaymentRecord) {
     toDateOnly(payment.creditDate) ??
     toDateOnly(payment.receivedDate)
   );
+}
+
+function getFinancialTransactionId(transaction: AsaasFinancialTransactionRecord) {
+  return transaction.id != null
+    ? String(transaction.id)
+    : buildSyntheticExternalId("txn", transaction);
+}
+
+function getTransferId(transfer: AsaasTransferRecord) {
+  return transfer.id != null ? String(transfer.id) : buildSyntheticExternalId("trf", transfer);
 }
 
 function getWebhookUrl(origin?: string | null) {
@@ -218,6 +249,103 @@ function buildInvoiceMirror(input: {
   };
 }
 
+function buildTransferMirror(input: {
+  userId: number;
+  accountId: number;
+  transfer: AsaasTransferRecord;
+}): InsertAsaasTransfer {
+  return {
+    userId: input.userId,
+    accountId: input.accountId,
+    asaasTransferId: getTransferId(input.transfer),
+    status: String(input.transfer.status ?? "PENDING"),
+    transferType:
+      input.transfer.transferType != null ? String(input.transfer.transferType) : null,
+    operationType:
+      input.transfer.operationType != null ? String(input.transfer.operationType) : null,
+    value: toDecimalString(normalizeAmount(input.transfer.value ?? input.transfer.amount)),
+    netValue:
+      input.transfer.netValue != null
+        ? toDecimalString(normalizeAmount(input.transfer.netValue))
+        : null,
+    transferDate: toDateOnly(input.transfer.transferDate ?? input.transfer.dateCreated),
+    scheduledDate: toDateOnly(input.transfer.scheduledDate ?? input.transfer.scheduleDate),
+    effectiveDate: toDateOnly(input.transfer.effectiveDate),
+    bankName:
+      getNestedString(input.transfer.bankAccount, ["bank", "name"]) ??
+      getNestedString(input.transfer.bankAccount, ["bank", "code"]) ??
+      getNestedString(input.transfer, ["bank", "name"]),
+    recipientName:
+      getNestedString(input.transfer.bankAccount, ["ownerName"]) ??
+      getNestedString(input.transfer.bankAccount, ["accountName"]) ??
+      getNestedString(input.transfer, ["recipient", "name"]),
+    externalReference:
+      input.transfer.externalReference != null ? String(input.transfer.externalReference) : null,
+    lastSyncedAt: new Date(),
+    cancelledAt:
+      ["CANCELLED", "FAILED"].includes(String(input.transfer.status ?? "").toUpperCase())
+        ? new Date()
+        : null,
+    rawPayload: JSON.stringify(input.transfer),
+  };
+}
+
+function buildFinancialTransactionMirror(input: {
+  userId: number;
+  accountId: number;
+  transaction: AsaasFinancialTransactionRecord;
+}): InsertAsaasFinancialTransaction {
+  const paymentRef = input.transaction.payment;
+  const transferRef = input.transaction.transfer;
+  const invoiceRef = input.transaction.invoice;
+
+  return {
+    userId: input.userId,
+    accountId: input.accountId,
+    asaasTransactionId: getFinancialTransactionId(input.transaction),
+    transactionType:
+      input.transaction.transactionType != null
+        ? String(input.transaction.transactionType)
+        : input.transaction.type != null
+          ? String(input.transaction.type)
+          : null,
+    entryType:
+      input.transaction.entryType != null ? String(input.transaction.entryType) : null,
+    status: input.transaction.status != null ? String(input.transaction.status) : null,
+    description:
+      input.transaction.description != null ? String(input.transaction.description) : null,
+    value: toDecimalString(normalizeAmount(input.transaction.value ?? input.transaction.amount)),
+    balance:
+      input.transaction.balance != null
+        ? toDecimalString(normalizeAmount(input.transaction.balance))
+        : null,
+    transactionDate: toDateOnly(
+      input.transaction.transactionDate ?? input.transaction.date ?? input.transaction.effectiveDate
+    ),
+    effectiveDate: toDateOnly(input.transaction.effectiveDate ?? input.transaction.date),
+    asaasChargeId:
+      paymentRef == null
+        ? null
+        : typeof paymentRef === "object"
+          ? getNestedString(paymentRef, ["id"])
+          : String(paymentRef),
+    asaasTransferId:
+      transferRef == null
+        ? null
+        : typeof transferRef === "object"
+          ? getNestedString(transferRef, ["id"])
+          : String(transferRef),
+    asaasInvoiceId:
+      invoiceRef == null
+        ? null
+        : typeof invoiceRef === "object"
+          ? getNestedString(invoiceRef, ["id"])
+          : String(invoiceRef),
+    lastSyncedAt: new Date(),
+    rawPayload: JSON.stringify(input.transaction),
+  };
+}
+
 async function ensureCustomerSynced(userId: number, clientId: number) {
   const account = await requireAsaasAccount(userId);
   const localClient = await asaasDb.getClientForSync(userId, clientId);
@@ -354,6 +482,58 @@ async function syncPaymentMirror(input: {
   );
 }
 
+async function listAllPages<T extends AnyRecord>(
+  fetchPage: (params: { limit: number; offset: number }) => Promise<{
+    data: T[];
+    hasMore?: boolean;
+    limit?: number;
+  }>
+) {
+  const limit = 100;
+  let offset = 0;
+  const items: T[] = [];
+
+  while (true) {
+    const page = await fetchPage({ limit, offset });
+    const data = Array.isArray(page.data) ? page.data : [];
+    items.push(...data);
+
+    if (!page.hasMore || data.length === 0) {
+      break;
+    }
+
+    offset += page.limit ?? limit;
+  }
+
+  return items;
+}
+
+async function createImportAuditEvent(input: {
+  userId: number;
+  accountId: number;
+  resourceType: string;
+  importedCount: number;
+  payload: unknown;
+}) {
+  return asaasDb.createAsaasWebhookEvent({
+    userId: input.userId,
+    accountId: input.accountId,
+    eventFingerprint: buildSyntheticExternalId(`import_${input.resourceType}`, {
+      at: new Date().toISOString(),
+      count: input.importedCount,
+      payload: input.payload,
+    }),
+    eventType: `IMPORT_${input.resourceType.toUpperCase()}`,
+    resourceType: "import",
+    resourceId: String(input.importedCount),
+    duplicate: false,
+    processed: true,
+    lastError: null,
+    payload: JSON.stringify(input.payload),
+    processedAt: new Date(),
+  });
+}
+
 export async function getAsaasIntegration(userId: number, origin?: string | null) {
   const account = await asaasDb.getAsaasAccount(userId);
   if (!account) {
@@ -432,13 +612,31 @@ export async function testAsaasConnection(userId: number) {
 
 export async function getAsaasSyncStatus(userId: number) {
   const account = await getAsaasIntegration(userId);
-  const [charges, subscriptions, invoices, events, clients] = await Promise.all([
+  const [charges, subscriptions, invoices, transfers, financialTransactions, events, clients] =
+    await Promise.all([
     asaasDb.listAsaasCharges(userId),
     asaasDb.listAsaasSubscriptions(userId),
     asaasDb.listAsaasInvoices(userId),
+    asaasDb.listAsaasTransfers(userId),
+    asaasDb.listAsaasFinancialTransactions(userId),
     asaasDb.listAsaasEvents(userId),
     asaasDb.listClientsForSync(userId),
-  ]);
+    ]);
+
+  let balance: string | null = null;
+  if (account.configured && account.enabled) {
+    try {
+      const remoteAccount = await requireAsaasAccount(userId);
+      const remoteBalance = await getAsaasClient(remoteAccount).getBalance();
+      balance =
+        remoteBalance.balance != null
+          ? toDecimalString(normalizeAmount(remoteBalance.balance))
+          : null;
+    } catch {
+      balance = null;
+    }
+  }
+
   return {
     integration: account,
     totals: {
@@ -447,8 +645,11 @@ export async function getAsaasSyncStatus(userId: number) {
       charges: charges.length,
       subscriptions: subscriptions.length,
       invoices: invoices.length,
+      transfers: transfers.length,
+      financialTransactions: financialTransactions.length,
       events: events.length,
       pendingEvents: events.filter(event => !event.processed).length,
+      currentBalance: balance,
     },
   };
 }
@@ -670,6 +871,14 @@ export async function listAsaasInvoices(userId: number) {
   return asaasDb.listAsaasInvoices(userId);
 }
 
+export async function listAsaasTransfers(userId: number) {
+  return asaasDb.listAsaasTransfers(userId);
+}
+
+export async function listAsaasFinancialTransactions(userId: number) {
+  return asaasDb.listAsaasFinancialTransactions(userId);
+}
+
 export async function issueAsaasInvoice(
   userId: number,
   input: {
@@ -758,6 +967,213 @@ export async function resendAsaasInvoice(userId: number, invoiceId: number) {
       invoice,
     })
   );
+}
+
+export async function importAsaasHistory(
+  userId: number,
+  scope: {
+    charges?: boolean;
+    subscriptions?: boolean;
+    invoices?: boolean;
+    transfers?: boolean;
+    financialTransactions?: boolean;
+  } = {}
+) {
+  const account = await requireAsaasAccount(userId);
+  const client = getAsaasClient(account);
+
+  const runScope = {
+    charges: scope.charges ?? true,
+    subscriptions: scope.subscriptions ?? true,
+    invoices: scope.invoices ?? true,
+    transfers: scope.transfers ?? true,
+    financialTransactions: scope.financialTransactions ?? true,
+  };
+
+  const result = {
+    charges: 0,
+    subscriptions: 0,
+    invoices: 0,
+    transfers: 0,
+    financialTransactions: 0,
+    currentBalance: null as string | null,
+    historicalEventsImported: false,
+  };
+
+  if (runScope.subscriptions) {
+    const remoteSubscriptions = await listAllPages(params => client.listSubscriptions(params));
+
+    for (const subscription of remoteSubscriptions) {
+      const localClient = await asaasDb.getClientByAsaasCustomerId(
+        userId,
+        String(subscription.customer)
+      );
+      await asaasDb.upsertAsaasSubscription(
+        buildSubscriptionMirror({
+          userId,
+          accountId: account.id,
+          clientId: localClient?.id ?? null,
+          serviceId: null,
+          subscription,
+        })
+      );
+    }
+
+    result.subscriptions = remoteSubscriptions.length;
+    await createImportAuditEvent({
+      userId,
+      accountId: account.id,
+      resourceType: "subscriptions",
+      importedCount: remoteSubscriptions.length,
+      payload: { scope: "subscriptions", importedCount: remoteSubscriptions.length },
+    });
+  }
+
+  if (runScope.charges) {
+    const remotePayments = await listAllPages(params => client.listPayments(params));
+
+    for (const payment of remotePayments) {
+      const localCharge = await asaasDb.getAsaasChargeByExternalId(account.id, String(payment.id));
+      const localSubscription =
+        payment.subscription != null
+          ? await asaasDb.getAsaasSubscriptionByExternalId(account.id, String(payment.subscription))
+          : undefined;
+      const localClient = await asaasDb.getClientByAsaasCustomerId(userId, String(payment.customer));
+
+      let pix: AsaasPixQrCodeRecord | null = null;
+      if (
+        String(payment.billingType ?? "").toUpperCase() === "PIX" &&
+        !["RECEIVED", "CONFIRMED", "DELETED"].includes(String(payment.status ?? "").toUpperCase())
+      ) {
+        try {
+          pix = await client.getPixQrCode(String(payment.id));
+        } catch {
+          pix = null;
+        }
+      }
+
+      await syncPaymentMirror({
+        userId,
+        accountId: account.id,
+        clientId: localCharge?.clientId ?? localSubscription?.clientId ?? localClient?.id ?? null,
+        serviceId: localCharge?.serviceId ?? localSubscription?.serviceId ?? null,
+        payment,
+        pix,
+        lastEvent: "IMPORT_PAYMENT",
+      });
+    }
+
+    result.charges = remotePayments.length;
+    await createImportAuditEvent({
+      userId,
+      accountId: account.id,
+      resourceType: "payments",
+      importedCount: remotePayments.length,
+      payload: { scope: "payments", importedCount: remotePayments.length },
+    });
+  }
+
+  if (runScope.invoices) {
+    const remoteInvoices = await listAllPages(params => client.listInvoices(params));
+
+    for (const invoice of remoteInvoices) {
+      const asaasChargeId =
+        invoice.payment == null
+          ? null
+          : typeof invoice.payment === "object"
+            ? getNestedString(invoice.payment, ["id"])
+            : String(invoice.payment);
+      const localCharge =
+        asaasChargeId != null
+          ? await asaasDb.getAsaasChargeByExternalId(account.id, asaasChargeId)
+          : undefined;
+
+      await asaasDb.upsertAsaasInvoice(
+        buildInvoiceMirror({
+          userId,
+          accountId: account.id,
+          chargeId: localCharge?.id ?? null,
+          revenueId: localCharge?.revenueId ?? null,
+          asaasChargeId,
+          invoice,
+        })
+      );
+    }
+
+    result.invoices = remoteInvoices.length;
+    await createImportAuditEvent({
+      userId,
+      accountId: account.id,
+      resourceType: "invoices",
+      importedCount: remoteInvoices.length,
+      payload: { scope: "invoices", importedCount: remoteInvoices.length },
+    });
+  }
+
+  if (runScope.transfers) {
+    const remoteTransfers = await listAllPages(params => client.listTransfers(params));
+
+    for (const transfer of remoteTransfers) {
+      await asaasDb.upsertAsaasTransfer(
+        buildTransferMirror({
+          userId,
+          accountId: account.id,
+          transfer,
+        })
+      );
+    }
+
+    result.transfers = remoteTransfers.length;
+    await createImportAuditEvent({
+      userId,
+      accountId: account.id,
+      resourceType: "transfers",
+      importedCount: remoteTransfers.length,
+      payload: { scope: "transfers", importedCount: remoteTransfers.length },
+    });
+  }
+
+  if (runScope.financialTransactions) {
+    const remoteTransactions = await listAllPages(params => client.listFinancialTransactions(params));
+
+    for (const transaction of remoteTransactions) {
+      await asaasDb.upsertAsaasFinancialTransaction(
+        buildFinancialTransactionMirror({
+          userId,
+          accountId: account.id,
+          transaction,
+        })
+      );
+    }
+
+    result.financialTransactions = remoteTransactions.length;
+    await createImportAuditEvent({
+      userId,
+      accountId: account.id,
+      resourceType: "financial_transactions",
+      importedCount: remoteTransactions.length,
+      payload: {
+        scope: "financialTransactions",
+        importedCount: remoteTransactions.length,
+      },
+    });
+  }
+
+  try {
+    const balance = await client.getBalance();
+    result.currentBalance =
+      balance.balance != null ? toDecimalString(normalizeAmount(balance.balance)) : null;
+  } catch {
+    result.currentBalance = null;
+  }
+
+  await asaasDb.markAsaasConnection(
+    account.id,
+    "conectado",
+    "Historico do Asaas importado para o espelho local."
+  );
+
+  return result;
 }
 
 export async function listAsaasEvents(userId: number) {

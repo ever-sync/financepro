@@ -23,7 +23,7 @@ export default function Fornecedores() {
   const [orderBy, setOrderBy] = useState("dueDate");
   const [orderDirection, setOrderDirection] = useState<"asc" | "desc">("asc");
   
-  const { data: suppliers = [], isLoading: loadingSuppliers } = trpc.suppliers.list.useQuery();
+  const { data: suppliersData, isLoading: loadingSuppliers } = trpc.suppliers.list.useQuery();
   const { data: purchasesData, isLoading: loadingPurchases } = trpc.supplierPurchases.list.useQuery({ 
     month, 
     year,
@@ -32,6 +32,7 @@ export default function Fornecedores() {
     orderBy,
     orderDirection
   });
+  const suppliers = Array.isArray(suppliersData) ? suppliersData : suppliersData?.data ?? [];
   const purchases = purchasesData?.data || [];
   const pagination = purchasesData?.pagination;
   const createSupplier = trpc.suppliers.create.useMutation({ onSuccess: () => { utils.suppliers.list.invalidate(); toast.success("Fornecedor adicionado"); setOpenSupplier(false); } });

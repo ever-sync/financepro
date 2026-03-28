@@ -22,8 +22,10 @@ export default function FundoReserva() {
   const { data: companyItems = [] }   = trpc.reserveFunds.list.useQuery({ type: "empresa" });
   const { data: personalItems = [] }  = trpc.reserveFunds.list.useQuery({ type: "pessoal" });
   const { data: settings }            = trpc.settings.get.useQuery();
-  const { data: companyFixed = [] }   = trpc.companyFixedCosts.list.useQuery({ month, year });
-  const { data: personalFixed = [] }  = trpc.personalFixedCosts.list.useQuery({ month, year });
+  const { data: companyFixed }        = trpc.companyFixedCosts.list.useQuery({ month, year });
+  const { data: personalFixed }       = trpc.personalFixedCosts.list.useQuery({ month, year });
+  const companyFixedRows = Array.isArray(companyFixed) ? companyFixed : companyFixed?.data ?? [];
+  const personalFixedRows = Array.isArray(personalFixed) ? personalFixed : personalFixed?.data ?? [];
 
   const createMut = trpc.reserveFunds.create.useMutation({ onSuccess: () => { utils.reserveFunds.list.invalidate(); toast.success("Depósito adicionado"); setOpen(false); } });
   const deleteMut = trpc.reserveFunds.delete.useMutation({ onSuccess: () => { utils.reserveFunds.list.invalidate(); toast.success("Removido"); } });
@@ -45,8 +47,8 @@ export default function FundoReserva() {
   const personalTotal   = personalItems.reduce((s, i) => s + parseFloat(i.depositAmount), 0);
 
   // Meta = meses configurados × total mensal das contas fixas
-  const companyMonthly  = companyFixed.reduce((s, i) => s + parseFloat(i.amount), 0);
-  const personalMonthly = personalFixed.reduce((s, i) => s + parseFloat(i.amount), 0);
+  const companyMonthly  = companyFixedRows.reduce((s, i) => s + parseFloat(i.amount), 0);
+  const personalMonthly = personalFixedRows.reduce((s, i) => s + parseFloat(i.amount), 0);
   const companyGoal     = companyMonthly  * (settings?.companyReserveMonths  || 3);
   const personalGoal    = personalMonthly * (settings?.personalReserveMonths || 6);
 

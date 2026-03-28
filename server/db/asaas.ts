@@ -2,8 +2,10 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import {
   asaasAccounts,
   asaasCharges,
+  asaasFinancialTransactions,
   asaasInvoices,
   asaasSubscriptions,
+  asaasTransfers,
   asaasWebhookEvents,
   clients,
   revenues,
@@ -11,8 +13,10 @@ import {
   settings,
   type InsertAsaasAccount,
   type InsertAsaasCharge,
+  type InsertAsaasFinancialTransaction,
   type InsertAsaasInvoice,
   type InsertAsaasSubscription,
+  type InsertAsaasTransfer,
   type InsertAsaasWebhookEvent,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
@@ -336,6 +340,89 @@ export async function upsertAsaasInvoice(data: InsertAsaasInvoice) {
     return { ...existing, ...data };
   }
   const [created] = await db.insert(asaasInvoices).values(data).returning();
+  return created;
+}
+
+export async function listAsaasTransfers(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(asaasTransfers)
+    .where(eq(asaasTransfers.userId, userId))
+    .orderBy(desc(asaasTransfers.transferDate), desc(asaasTransfers.createdAt));
+}
+
+export async function getAsaasTransferByExternalId(accountId: number, asaasTransferId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [record] = await db
+    .select()
+    .from(asaasTransfers)
+    .where(and(eq(asaasTransfers.accountId, accountId), eq(asaasTransfers.asaasTransferId, asaasTransferId)))
+    .limit(1);
+  return record;
+}
+
+export async function upsertAsaasTransfer(data: InsertAsaasTransfer) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await getAsaasTransferByExternalId(data.accountId, data.asaasTransferId);
+  if (existing) {
+    await db.update(asaasTransfers).set(data).where(eq(asaasTransfers.id, existing.id));
+    return { ...existing, ...data };
+  }
+  const [created] = await db.insert(asaasTransfers).values(data).returning();
+  return created;
+}
+
+export async function listAsaasFinancialTransactions(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(asaasFinancialTransactions)
+    .where(eq(asaasFinancialTransactions.userId, userId))
+    .orderBy(
+      desc(asaasFinancialTransactions.transactionDate),
+      desc(asaasFinancialTransactions.createdAt)
+    );
+}
+
+export async function getAsaasFinancialTransactionByExternalId(
+  accountId: number,
+  asaasTransactionId: string
+) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [record] = await db
+    .select()
+    .from(asaasFinancialTransactions)
+    .where(
+      and(
+        eq(asaasFinancialTransactions.accountId, accountId),
+        eq(asaasFinancialTransactions.asaasTransactionId, asaasTransactionId)
+      )
+    )
+    .limit(1);
+  return record;
+}
+
+export async function upsertAsaasFinancialTransaction(data: InsertAsaasFinancialTransaction) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await getAsaasFinancialTransactionByExternalId(
+    data.accountId,
+    data.asaasTransactionId
+  );
+  if (existing) {
+    await db
+      .update(asaasFinancialTransactions)
+      .set(data)
+      .where(eq(asaasFinancialTransactions.id, existing.id));
+    return { ...existing, ...data };
+  }
+  const [created] = await db.insert(asaasFinancialTransactions).values(data).returning();
   return created;
 }
 

@@ -17,12 +17,17 @@ interface PaymentItem {
 
 export default function Calendario() {
   const { month, year, monthName, goToPrevMonth, goToNextMonth } = useMonthYear();
-  const { data: companyFixed = [] } = trpc.companyFixedCosts.list.useQuery({ month, year });
-  const { data: companyVariable = [] } = trpc.companyVariableCosts.list.useQuery({ month, year });
-  const { data: personalFixed = [] } = trpc.personalFixedCosts.list.useQuery({ month, year });
-  const { data: personalVariable = [] } = trpc.personalVariableCosts.list.useQuery({ month, year });
-  const { data: employees = [] } = trpc.employees.list.useQuery();
+  const { data: companyFixed } = trpc.companyFixedCosts.list.useQuery({ month, year });
+  const { data: companyVariable } = trpc.companyVariableCosts.list.useQuery({ month, year });
+  const { data: personalFixed } = trpc.personalFixedCosts.list.useQuery({ month, year });
+  const { data: personalVariable } = trpc.personalVariableCosts.list.useQuery({ month, year });
+  const { data: employees } = trpc.employees.list.useQuery();
   const { data: debts = [] } = trpc.debts.list.useQuery();
+  const companyFixedRows = Array.isArray(companyFixed) ? companyFixed : companyFixed?.data ?? [];
+  const companyVariableRows = Array.isArray(companyVariable) ? companyVariable : companyVariable?.data ?? [];
+  const personalFixedRows = Array.isArray(personalFixed) ? personalFixed : personalFixed?.data ?? [];
+  const personalVariableRows = Array.isArray(personalVariable) ? personalVariable : personalVariable?.data ?? [];
+  const employeeRows = Array.isArray(employees) ? employees : employees?.data ?? [];
 
   const today = new Date().getDate();
   const currentMonth = new Date().getMonth() + 1;
@@ -31,7 +36,7 @@ export default function Calendario() {
   const getDayFromDate = (date: string) => Number(date.slice(8, 10));
 
   const payments: PaymentItem[] = [
-    ...companyFixed.map(item => ({
+    ...companyFixedRows.map(item => ({
       id: `cf-${item.id}`,
       description: `[EMP] ${item.description}`,
       amount: item.amount,
@@ -39,7 +44,7 @@ export default function Calendario() {
       status: item.status,
       type: "empresa-fixo" as const,
     })),
-    ...companyVariable.map(item => ({
+    ...companyVariableRows.map(item => ({
       id: `cv-${item.id}`,
       description: `[EMP] ${item.description}`,
       amount: item.amount,
@@ -47,7 +52,7 @@ export default function Calendario() {
       status: item.status,
       type: "empresa-variavel" as const,
     })),
-    ...personalFixed.map(item => ({
+    ...personalFixedRows.map(item => ({
       id: `pf-${item.id}`,
       description: `[PES] ${item.description}`,
       amount: item.amount,
@@ -55,7 +60,7 @@ export default function Calendario() {
       status: item.status,
       type: "pessoal-fixo" as const,
     })),
-    ...personalVariable.map(item => ({
+    ...personalVariableRows.map(item => ({
       id: `pv-${item.id}`,
       description: `[PES] ${item.description}`,
       amount: item.amount,
@@ -63,7 +68,7 @@ export default function Calendario() {
       status: item.status,
       type: "pessoal-variavel" as const,
     })),
-    ...employees
+    ...employeeRows
       .filter(item => item.status === "ativo")
       .map(item => ({
         id: `em-${item.id}`,
