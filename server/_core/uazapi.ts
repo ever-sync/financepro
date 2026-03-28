@@ -18,6 +18,10 @@ export type UazapiConfig = {
   instanceId: string;
 };
 
+function isLegacyRouteError(error: unknown) {
+  return error instanceof UazapiRequestError && (error.status === 404 || error.status === 405);
+}
+
 export class UazapiClient {
   private readonly client: AxiosInstance;
   private readonly instanceId: string;
@@ -28,6 +32,7 @@ export class UazapiClient {
       baseURL: config.apiBaseUrl.replace(/\/$/, ""),
       timeout: 20_000,
       headers: {
+        token: config.apiToken,
         apikey: config.apiToken,
         "Content-Type": "application/json",
       },
@@ -52,32 +57,79 @@ export class UazapiClient {
     }
   }
 
+  private async withLegacyFallback<T>(primary: () => Promise<T>, legacy: () => Promise<T>): Promise<T> {
+    try {
+      return await primary();
+    } catch (error) {
+      if (!isLegacyRouteError(error)) {
+        throw error;
+      }
+    }
+
+    return legacy();
+  }
+
   async getInstanceStatus() {
-    return this.request<Record<string, unknown>>(() =>
-      this.client.get(`/instance/status/${this.instanceId}`)
+    return this.withLegacyFallback(
+      () =>
+        this.request<Record<string, unknown>>(() =>
+          this.client.get("/instance/status")
+        ),
+      () =>
+        this.request<Record<string, unknown>>(() =>
+          this.client.get(`/instance/status/${this.instanceId}`)
+        )
     );
   }
 
   async configureWebhook(url: string) {
-    return this.request<Record<string, unknown>>(() =>
-      this.client.post(`/webhook/edit/${this.instanceId}`, {
-        url,
-        enabled: true,
-        local_map: false,
-      })
+    return this.withLegacyFallback(
+      () =>
+        this.request<Record<string, unknown>>(() =>
+          this.client.post("/webhook", {
+            enabled: true,
+            url,
+            events: ["messages", "connection"],
+            excludeMessages: ["wasSentByApi"],
+            addUrlEvents: false,
+            addUrlTypesMessages: false,
+          })
+        ),
+      () =>
+        this.request<Record<string, unknown>>(() =>
+          this.client.post(`/webhook/edit/${this.instanceId}`, {
+            url,
+            enabled: true,
+            local_map: false,
+          })
+        )
     );
   }
 
   async sendTextMessage(phoneNumber: string, message: string) {
-    return this.request<Record<string, unknown>>(() =>
-      this.client.post(`/message/sendText/${this.instanceId}`, {
-        number: phoneNumber.replace(/\D/g, ""),
-        text: message,
-      })
+    const normalizedNumber = phoneNumber.includes("@")
+      ? phoneNumber.trim()
+      : phoneNumber.replace(/\D/g, "");
+
+    return this.withLegacyFallback(
+      () =>
+        this.request<Record<string, unknown>>(() =>
+          this.client.post("/send/text", {
+            number: normalizedNumber,
+            text: message,
+          })
+        ),
+      () =>
+        this.request<Record<string, unknown>>(() =>
+          this.client.post(`/message/sendText/${this.instanceId}`, {
+            number: normalizedNumber,
+            text: message,
+          })
+        )
     );
   }
 }
 
 export function normalizeWhatsAppPhone(value: string) {
-  return value.replace(/\D/g, "");
+  return value.includes("@") ? value.trim() : value.replace(/\D/g, "");
 }

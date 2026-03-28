@@ -83,6 +83,8 @@ export const settings = pgTable("settings", {
   proLaboreGross: numeric("proLaboreGross", { precision: 12, scale: 2 }).default("0.00").notNull(),
   companyReserveMonths: integer("companyReserveMonths").default(3).notNull(),
   personalReserveMonths: integer("personalReserveMonths").default(6).notNull(),
+  companyMinCashMonths: numeric("companyMinCashMonths", { precision: 6, scale: 2 }).default("1.00").notNull(),
+  personalMinCashMonths: numeric("personalMinCashMonths", { precision: 6, scale: 2 }).default("1.00").notNull(),
   companyName: varchar("companyName", { length: 255 }).default("Minha Empresa"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
@@ -387,7 +389,7 @@ export const asaasCharges = pgTable("asaas_charges", {
   externalReference: varchar("externalReference", { length: 120 }),
   invoiceUrl: varchar("invoiceUrl", { length: 500 }),
   bankSlipUrl: varchar("bankSlipUrl", { length: 500 }),
-  pixQrCodeUrl: varchar("pixQrCodeUrl", { length: 500 }),
+  pixQrCodeUrl: text("pixQrCodeUrl"),
   pixCopyAndPaste: text("pixCopyAndPaste"),
   lastEvent: varchar("lastEvent", { length: 120 }),
   lastSyncedAt: timestamp("lastSyncedAt"),
@@ -699,6 +701,31 @@ export const notificationEvents = pgTable("notification_events", {
 
 export type NotificationEvent = typeof notificationEvents.$inferSelect;
 export type InsertNotificationEvent = typeof notificationEvents.$inferInsert;
+
+// ==================== FINANCIAL ADVISOR SNAPSHOTS ====================
+export const financialAdvisorSnapshots = pgTable("financial_advisor_snapshots", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  integrationId: integer("integrationId"),
+  relatedPlanId: integer("relatedPlanId"),
+  snapshotType: varchar("snapshotType", { length: 40 }).notNull(),
+  referenceDate: varchar("referenceDate", { length: 10 }).notNull(),
+  periodMonth: integer("periodMonth").notNull(),
+  periodYear: integer("periodYear").notNull(),
+  status: varchar("status", { length: 40 }).default("generated").notNull(),
+  cashRiskLevel: varchar("cashRiskLevel", { length: 20 }).notNull(),
+  summary: text("summary").notNull(),
+  confidenceScore: numeric("confidenceScore", { precision: 4, scale: 2 }).default("1.00").notNull(),
+  snapshotPayload: text("snapshotPayload").notNull(),
+  recommendationsPayload: text("recommendationsPayload"),
+  confirmedAt: timestamp("confirmedAt"),
+  executedAt: timestamp("executedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type FinancialAdvisorSnapshot = typeof financialAdvisorSnapshots.$inferSelect;
+export type InsertFinancialAdvisorSnapshot = typeof financialAdvisorSnapshots.$inferInsert;
 
 // ==================== FUNDO DE RESERVA ====================
 export const reserveFunds = pgTable("reserve_funds", {

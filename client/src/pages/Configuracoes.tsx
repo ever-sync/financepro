@@ -27,6 +27,8 @@ export default function Configuracoes() {
     proLaboreGross: "0",
     companyReserveMonths: 3,
     personalReserveMonths: 6,
+    companyMinCashMonths: "1",
+    personalMinCashMonths: "1",
   });
 
   useEffect(() => {
@@ -39,6 +41,8 @@ export default function Configuracoes() {
         proLaboreGross: settings.proLaboreGross || "0",
         companyReserveMonths: settings.companyReserveMonths || 3,
         personalReserveMonths: settings.personalReserveMonths || 6,
+        companyMinCashMonths: settings.companyMinCashMonths || "1",
+        personalMinCashMonths: settings.personalMinCashMonths || "1",
       });
     }
   }, [settings]);
@@ -161,6 +165,18 @@ export default function Configuracoes() {
                 <Label>Reserva Pessoal (meses)</Label>
                 <Input type="number" min="1" max="24" value={form.personalReserveMonths} onChange={e => setForm(f => ({ ...f, personalReserveMonths: parseInt(e.target.value) || 6 }))} />
                 <p className="text-[10px] text-muted-foreground mt-1">Meses de despesas pessoais</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Caixa mínimo empresa (meses)</Label>
+                <Input type="number" min="0.5" max="12" step="0.5" value={form.companyMinCashMonths} onChange={e => setForm(f => ({ ...f, companyMinCashMonths: e.target.value }))} />
+                <p className="text-[10px] text-muted-foreground mt-1">Folga operacional mínima que não deve ser tocada</p>
+              </div>
+              <div>
+                <Label>Caixa mínimo pessoal (meses)</Label>
+                <Input type="number" min="0.5" max="12" step="0.5" value={form.personalMinCashMonths} onChange={e => setForm(f => ({ ...f, personalMinCashMonths: e.target.value }))} />
+                <p className="text-[10px] text-muted-foreground mt-1">Folga mínima para segurar as despesas essenciais</p>
               </div>
             </div>
           </CardContent>

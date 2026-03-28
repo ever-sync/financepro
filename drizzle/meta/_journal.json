@@ -85,6 +85,20 @@
       "when": 1774900800000,
       "tag": "0012_asaas_history",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774911600000,
+      "tag": "0013_asaas_pix_qr_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1774915200000,
+      "tag": "0014_financial_advisor",
+      "breakpoints": true
     }
   ]
 }

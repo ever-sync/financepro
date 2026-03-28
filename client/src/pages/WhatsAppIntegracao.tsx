@@ -31,6 +31,7 @@ export default function WhatsAppIntegracao() {
     onSuccess: () => toast.success("Mensagem de teste enviada."),
     onError: error => toast.error(error.message),
   });
+  const canSendTest = Boolean(integration?.authorizedPhone) && integration?.lastConnectionStatus === "sincronizado";
 
   const [form, setForm] = useState({
     instanceId: "",
@@ -70,10 +71,24 @@ export default function WhatsAppIntegracao() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => testMut.mutate()} disabled={testMut.isPending}>
+          <Button
+            variant="outline"
+            onClick={() =>
+              testMut.mutate({
+                instanceId: form.instanceId,
+                apiBaseUrl: form.apiBaseUrl,
+                apiToken: form.apiToken || undefined,
+              })
+            }
+            disabled={testMut.isPending || !form.instanceId || !form.apiBaseUrl}
+          >
             {testMut.isPending ? "Testando..." : "Testar conexao"}
           </Button>
-          <Button variant="outline" onClick={() => sendTestMut.mutate()} disabled={sendTestMut.isPending}>
+          <Button
+            variant="outline"
+            onClick={() => sendTestMut.mutate()}
+            disabled={sendTestMut.isPending || !canSendTest}
+          >
             {sendTestMut.isPending ? "Enviando..." : "Enviar teste"}
           </Button>
           <Button onClick={() => saveMut.mutate(form)} disabled={saveMut.isPending}>
@@ -86,7 +101,9 @@ export default function WhatsAppIntegracao() {
         <Card>
           <CardHeader>
             <CardTitle>Configuracao Uazapi</CardTitle>
-            <CardDescription>Os segredos ficam no backend. Deixe o token em branco para manter o atual.</CardDescription>
+            <CardDescription>
+              Os segredos ficam no backend. Use o token da instancia da Uazapi, nao o admintoken. Deixe o token em branco para manter o atual.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
@@ -98,10 +115,10 @@ export default function WhatsAppIntegracao() {
               <Input value={form.apiBaseUrl} onChange={event => setForm(prev => ({ ...prev, apiBaseUrl: event.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>API token</Label>
+              <Label>Token da instancia</Label>
               <Input
                 type="password"
-                placeholder={integration?.maskedApiToken || "Cole aqui o token da Uazapi"}
+                placeholder={integration?.maskedApiToken || "Cole aqui o token da instancia da Uazapi"}
                 value={form.apiToken}
                 onChange={event => setForm(prev => ({ ...prev, apiToken: event.target.value }))}
               />
@@ -173,6 +190,7 @@ export default function WhatsAppIntegracao() {
               </div>
               <div className="space-y-2 rounded-2xl bg-muted p-4 text-sm text-muted-foreground">
                 <p>Webhook: {integration?.webhookUrl || "-"}</p>
+                <p>Ultimo retorno da Uazapi: {integration?.lastConnectionMessage || "-"}</p>
                 <p>Ultima mensagem recebida: {integration?.lastMessageReceivedAt ? new Date(integration.lastMessageReceivedAt).toLocaleString("pt-BR") : "-"}</p>
                 <p>Ultima mensagem enviada: {integration?.lastMessageSentAt ? new Date(integration.lastMessageSentAt).toLocaleString("pt-BR") : "-"}</p>
               </div>
@@ -183,4 +201,3 @@ export default function WhatsAppIntegracao() {
     </div>
   );
 }
-

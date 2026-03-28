@@ -51,6 +51,20 @@ export async function getWhatsAppIntegrationByInstanceId(instanceId: string) {
   return record;
 }
 
+export async function getWhatsAppIntegrationByApiToken(apiToken: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const normalizedToken = apiToken.trim();
+  if (!normalizedToken) return undefined;
+
+  const [record] = await db
+    .select()
+    .from(whatsappIntegrations)
+    .where(eq(whatsappIntegrations.apiToken, normalizedToken))
+    .limit(1);
+  return record;
+}
+
 export async function upsertWhatsAppIntegration(
   userId: number,
   data: Partial<InsertWhatsAppIntegration> &

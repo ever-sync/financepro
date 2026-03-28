@@ -111,6 +111,7 @@ export default function DashboardEmpresa() {
   const { user } = useSupabaseAuth();
   const { month, year } = useMonthYear();
   const { data, isLoading } = trpc.dashboard.company.useQuery({ month, year });
+  const { data: advisorSnapshot } = trpc.financialAdvisor.getSnapshot.useQuery();
   const [activeTab, setActiveTab] = useState("Visão geral");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -269,6 +270,57 @@ export default function DashboardEmpresa() {
             Acompanhe suas tarefas, monitore o progresso e acompanhe os status.
           </p>
         </section>
+
+        {advisorSnapshot ? (
+          <section className={cn(panelClass, "p-5")}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-zinc-400">
+                  Copiloto Financeiro
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
+                  Guardrails consolidados do mês
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm text-zinc-500">{advisorSnapshot.summary}</p>
+              </div>
+              <div
+                className={cn(
+                  "inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em]",
+                  advisorSnapshot.cashRiskLevel === "critical"
+                    ? "bg-rose-50 text-rose-600"
+                    : advisorSnapshot.cashRiskLevel === "attention"
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-emerald-50 text-emerald-600"
+                )}
+              >
+                {advisorSnapshot.cashRiskLevel}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <AdvisorMetricCard
+                label="Gasto seguro hoje"
+                value={formatMoney(advisorSnapshot.safeToSpendNow)}
+                note="Teto diário sem apertar o restante do mês"
+              />
+              <AdvisorMetricCard
+                label="Gasto seguro mês"
+                value={formatMoney(advisorSnapshot.safeToSpendMonth)}
+                note="Espaço restante após reservas e proteções"
+              />
+              <AdvisorMetricCard
+                label="Caixa protegido"
+                value={formatMoney(advisorSnapshot.protectedCash)}
+                note="Impostos, caixa mínimo e parcelas protegidas"
+              />
+              <AdvisorMetricCard
+                label="Reserva recomendada"
+                value={formatMoney(advisorSnapshot.companyReserveRecommendation + advisorSnapshot.personalReserveRecommendation)}
+                note="Sugestão consolidada para reforço de reserva"
+              />
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr_1.05fr]">
           <Card className={cn(panelClass, "border-zinc-200 py-0")}>
@@ -558,6 +610,24 @@ export default function DashboardEmpresa() {
           </Card>
         </section>
       </div>
+    </div>
+  );
+}
+
+function AdvisorMetricCard({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="rounded-[24px] border border-zinc-200 bg-white/70 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-400">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">{value}</p>
+      <p className="mt-2 text-xs text-zinc-500">{note}</p>
     </div>
   );
 }

@@ -89,6 +89,12 @@ function toNumber(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function rowsFromResult<T>(value: T[] | PaginatedResult<T> | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  return [];
+}
+
 function parseDateParts(value?: string | null) {
   if (!value) return null;
   const [yearPart, monthPart, dayPart] = value.split("-").map(Number);
@@ -941,16 +947,16 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
   if (!db) return null;
 
   // Ensure month-specific fixed costs are hydrated before we read the broader timeline.
-  const currentFixedCosts = await getCompanyFixedCosts(userId, month, year);
+  const currentFixedCosts = rowsFromResult(await getCompanyFixedCosts(userId, month, year));
 
   const [
-    revenueRows,
-    allFixedCosts,
-    variableCostRows,
-    employeeRows,
-    purchaseRows,
+    revenueData,
+    allFixedCostsData,
+    variableCostData,
+    employeeData,
+    purchaseData,
     reserveRows,
-    supplierRows,
+    supplierData,
     userSettings,
   ] = await Promise.all([
     getRevenues(userId),
@@ -962,6 +968,12 @@ export async function getCompanyDashboardData(userId: number, month: number, yea
     getSuppliers(userId),
     getSettings(userId),
   ]);
+  const revenueRows = rowsFromResult(revenueData);
+  const allFixedCosts = rowsFromResult(allFixedCostsData);
+  const variableCostRows = rowsFromResult(variableCostData);
+  const employeeRows = rowsFromResult(employeeData);
+  const purchaseRows = rowsFromResult(purchaseData);
+  const supplierRows = rowsFromResult(supplierData);
 
   const selectedSerial = monthSerial(year, month);
   const currentDate = new Date();
@@ -1405,10 +1417,10 @@ export async function getCalendarData(userId: number, month: number, year: numbe
   const currentYear = new Date().getFullYear();
   const isCurrentMonth = month === currentMonth && year === currentYear;
 
-  const fixedCo = await getCompanyFixedCosts(userId, month, year);
+  const fixedCo = rowsFromResult(await getCompanyFixedCosts(userId, month, year));
   fixedCo.forEach(c => items.push({ day: c.dueDay, description: `[EMP] ${c.description}`, amount: c.amount, type: "empresa-fixo", status: c.status }));
 
-  const variableCo = await getCompanyVariableCosts(userId, month, year);
+  const variableCo = rowsFromResult(await getCompanyVariableCosts(userId, month, year));
   variableCo.forEach(c => items.push({
     day: Number(c.date.slice(8, 10)),
     description: `[EMP] ${c.description}`,
@@ -1417,10 +1429,10 @@ export async function getCalendarData(userId: number, month: number, year: numbe
     status: c.status,
   }));
 
-  const fixedPe = await getPersonalFixedCosts(userId, month, year);
+  const fixedPe = rowsFromResult(await getPersonalFixedCosts(userId, month, year));
   fixedPe.forEach(c => items.push({ day: c.dueDay, description: `[PES] ${c.description}`, amount: c.amount, type: "pessoal-fixo", status: c.status }));
 
-  const variablePe = await getPersonalVariableCosts(userId, month, year);
+  const variablePe = rowsFromResult(await getPersonalVariableCosts(userId, month, year));
   variablePe.forEach(c => items.push({
     day: Number(c.date.slice(8, 10)),
     description: `[PES] ${c.description}`,
@@ -1429,7 +1441,7 @@ export async function getCalendarData(userId: number, month: number, year: numbe
     status: c.status,
   }));
 
-  const employees = await getEmployees(userId);
+  const employees = rowsFromResult(await getEmployees(userId));
   employees.filter(e => e.status === "ativo").forEach(e =>
     items.push({
       day: e.paymentDay ?? 5,

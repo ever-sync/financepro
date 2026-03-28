@@ -5,6 +5,7 @@ import { z } from "zod";
 import * as db from "./db";
 import * as asaas from "./asaas";
 import * as whatsapp from "./whatsapp";
+import * as financialAdvisor from "./financial-advisor";
 import { COOKIE_NAME } from "../shared/const";
 
 function getRequestOrigin(headers: Record<string, unknown>) {
@@ -38,6 +39,8 @@ export const appRouter = router({
         proLaboreGross: z.string().optional(),
         companyReserveMonths: z.number().optional(),
         personalReserveMonths: z.number().optional(),
+        companyMinCashMonths: z.string().optional(),
+        personalMinCashMonths: z.string().optional(),
         companyName: z.string().optional(),
       }))
       .mutation(({ ctx, input }) => db.upsertSettings({ userId: ctx.user.id, ...input })),
@@ -713,12 +716,23 @@ export const appRouter = router({
           getRequestOrigin(ctx.req.headers as Record<string, unknown>)
         )
       ),
-    testConnection: protectedProcedure.mutation(({ ctx }) =>
-      whatsapp.testWhatsAppConnection(
-        ctx.user.id,
-        getRequestOrigin(ctx.req.headers as Record<string, unknown>)
+    testConnection: protectedProcedure
+      .input(
+        z
+          .object({
+            instanceId: z.string().min(1).optional(),
+            apiBaseUrl: z.string().min(1).optional(),
+            apiToken: z.string().optional(),
+          })
+          .optional()
       )
-    ),
+      .mutation(({ ctx, input }) =>
+        whatsapp.testWhatsAppConnection(
+          ctx.user.id,
+          getRequestOrigin(ctx.req.headers as Record<string, unknown>),
+          input
+        )
+      ),
     syncStatus: protectedProcedure.query(({ ctx }) => whatsapp.getWhatsAppSyncStatus(ctx.user.id)),
     sendTestMessage: protectedProcedure.mutation(({ ctx }) => whatsapp.sendWhatsAppTestMessage(ctx.user.id)),
   }),
@@ -744,6 +758,34 @@ export const appRouter = router({
 
   assistantAudit: router({
     list: protectedProcedure.query(({ ctx }) => whatsapp.listAssistantRuns(ctx.user.id)),
+  }),
+
+  financialAdvisor: router({
+    getSnapshot: protectedProcedure.query(({ ctx }) =>
+      financialAdvisor.getFinancialAdvisorSnapshot(ctx.user.id)
+    ),
+    generateMonthlyPlan: protectedProcedure.mutation(({ ctx }) =>
+      financialAdvisor.generateFinancialAdvisorMonthlyPlan({
+        userId: ctx.user.id,
+        confirmed: true,
+      })
+    ),
+    getDailyDigest: protectedProcedure.query(({ ctx }) =>
+      financialAdvisor.getFinancialAdvisorDailyDigest({ userId: ctx.user.id })
+    ),
+    getMonthClose: protectedProcedure.query(({ ctx }) =>
+      financialAdvisor.getFinancialAdvisorMonthClose({ userId: ctx.user.id })
+    ),
+    confirmAction: protectedProcedure
+      .input(z.object({ actionId: z.number() }))
+      .mutation(({ ctx, input }) =>
+        financialAdvisor.confirmFinancialAdvisorAction(ctx.user.id, input.actionId)
+      ),
+    snoozeAlert: protectedProcedure
+      .input(z.object({ eventId: z.number(), hours: z.number().min(1).max(168).optional() }))
+      .mutation(({ ctx, input }) =>
+        financialAdvisor.snoozeFinancialAdvisorAlert(ctx.user.id, input.eventId, input.hours)
+      ),
   }),
 
   // ==================== DASHBOARDS ====================
